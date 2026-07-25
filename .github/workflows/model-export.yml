@@ -1,0 +1,75 @@
+name: Export HTDemucs ONNX
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/model-export.yml
+      - tools/stems/export_htdemucs_onnx.py
+      - tools/stems/model-export-requirements.txt
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-export-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  export:
+    name: Export and validate HTDemucs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      DEMUCS_COMMIT: d788c1a06876ced89b11d6531f771e5e40204d48
+      PYTHONHASHSEED: "0"
+    steps:
+      - name: Check out Mixxx
+        uses: actions/checkout@v7
+
+      - name: Check out the official Mixxx Demucs fork
+        uses: actions/checkout@v7
+        with:
+          repository: mixxxdj/demucs
+          ref: ${{ env.DEMUCS_COMMIT }}
+          path: _deps/demucs
+          persist-credentials: false
+
+      - name: Set up pinned Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.13.7
+          cache: pip
+          cache-dependency-path: |
+            .github/workflows/model-export.yml
+            tools/stems/model-export-requirements.txt
+
+      - name: Install pinned CPU export toolchain
+        run: |
+          python -m pip install --upgrade pip==25.2
+          python -m pip install \
+            --index-url https://download.pytorch.org/whl/cpu \
+            torch==2.8.0 \
+            torchaudio==2.8.0
+          python -m pip install -r tools/stems/model-export-requirements.txt
+          python -m pip install --no-deps ./_deps/demucs
+
+      - name: Export and validate model
+        run: |
+          python tools/stems/export_htdemucs_onnx.py \
+            --demucs-dir _deps/demucs \
+            --demucs-commit "${DEMUCS_COMMIT}" \
+            --output-dir model-export-output
+
+      - name: Verify checksums
+        working-directory: model-export-output
+        run: sha256sum --check SHA256SUMS
+
+      - name: Upload model bundle
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: htdemucs-onnx-${{ env.DEMUCS_COMMIT }}
+          path: model-export-output/
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 30
