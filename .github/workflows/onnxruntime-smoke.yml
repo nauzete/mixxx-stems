@@ -82,6 +82,7 @@ jobs:
         run: >-
           ${{ matrix.vcpkg }} install
           onnxruntime:${{ matrix.triplet }}
+          --classic
           --clean-after-build
           --x-abi-tools-use-exact-versions
         working-directory: _deps/vcpkg
