@@ -22,6 +22,7 @@
 | Mixxx | `66f7912343c9938339b9d3b12ed7a9fee38d97f5` | 2026-07-25 |
 | Demucs | `d788c1a06876ced89b11d6531f771e5e40204d48` | 2026-07-25 |
 | vcpkg | `41f250c938a7af7ee57bb49f30f94c5355d03c2f` | 2026-07-25 |
+| vcpkg 2.7 dependency line | `1c20f84aa1ffca2ef18a7d9c6bd7cdd1f5f2e265` | 2026-07-25 |
 
 ### Completed work
 
@@ -55,22 +56,63 @@ All feature branches start from the documented integration baseline.
 ### Pull requests
 
 - Draft integration PR: `https://github.com/nauzete/mixxx-stems/pull/1`
+- Draft native ARM64 packaging PR:
+  `https://github.com/nauzete/mixxx-stems/pull/2`
 - Component PRs will target `stems-integration` after their first coherent,
   buildable change. GitHub does not allow a PR between identical branch tips.
 
 ### Builds and tests
 
-- No Mixxx build has been run yet.
-- No package artifact has been generated yet.
+- Enabled GitHub Actions on the new fork.
+- Phase 1 (clean baseline builds) is complete at commit `bd7fe8613b`.
+- GitHub Actions run
+  `https://github.com/nauzete/mixxx-stems/actions/runs/30159873805`
+  completed successfully on its second attempt, including `Ready to merge`.
+- Windows x64 compiled, passed the configured tests, and generated an MSI.
+- Ubuntu 24.04 ARM64 compiled natively on `ubuntu-24.04-arm`; all 1,265
+  enabled tests passed.
+- The ARM64 job confirmed:
+  - runner architecture: `aarch64`;
+  - Debian package architecture: `arm64`;
+  - packaged executable: `ELF 64-bit LSB ... ARM aarch64`.
+- Windows ARM64 also compiled, passed its configured tests, and generated an
+  ARM64 MSI. This is additional coverage, not a product target.
+- The first run exposed two known upstream architecture-specific failures:
+  - libmad `FPM_DEFAULT` produces the documented first-sound sample 3,326 on
+    Ubuntu ARM64;
+  - Microsoft Media Foundation crashes in
+    `SoundSourceProxyTest.regressionTestCachingReaderChunkJumpForward` on
+    Windows ARM64 (`mixxxdj/mixxx#15638`).
+  Commit `bd7fe8613b` handles both cases without relaxing Windows x64 tests.
+- A macOS x64 Audio Unit initialization flake (`mixxxdj/mixxx#16448`) failed
+  the first attempt and passed when only failed jobs were rerun.
+- Supplied package integrity passed for all 51 files.
+- Supplied PioneerXDJ-RR Stems scaffold XML is well formed.
 - No ONNX model has been exported or committed.
 - No physical hardware test has been run.
+
+### Phase 1 artifacts
+
+| Artifact | Artifact ID | Size |
+| --- | ---: | ---: |
+| Windows x64 MSI | `8620176208` | 107,307,752 bytes |
+| Ubuntu ARM64 DEB | `8620596995` | 24,817,424 bytes |
+
+Downloaded Ubuntu ARM64 DEB SHA-256:
+`921a8eacc4a79adff49787ce659ccdabc2b0b2391d4ed2ecb0ddd2d14bd74f86`.
 
 ### Environment notes and blockers
 
 - GitHub CLI 2.96.0 was installed during bootstrap because it was absent.
 - GitHub CLI authentication could not reach `api.github.com` from its process,
-  while authenticated PowerShell REST calls and the connected GitHub app work.
-  Git operations use Git Credential Manager.
+  reliably during initial setup. GitHub CLI/API calls work when supplied the
+  token from Git Credential Manager, but DNS resolution remains intermittent.
+  The connected GitHub app is installed only for `PenaltyHUB`, so it cannot
+  mutate the new personal forks; authenticated API calls are used instead.
+- `mixxxdj/vcpkg:main` does not contain the CPU `onnxruntime` port merged by
+  PR #194. Created `nauzete/vcpkg-mixxx-stems:feature/onnx-runtime` from
+  `mixxxdj/vcpkg:2.7` at
+  `1c20f84aa1ffca2ef18a7d9c6bd7cdd1f5f2e265`.
 - `BLOCKED_EXTERNAL_HARDWARE`: Raspberry Pi 5, DDJ-FLX4, 10.1-inch touch
   display, thermal/throttling, master/headphone output, underrun, and two-hour
   soak tests require the physical devices.
@@ -83,6 +125,7 @@ All feature branches start from the documented integration baseline.
 
 ### Next task
 
-1. Establish clean Windows x64 and Ubuntu 24.04 ARM64 baseline build workflows.
-2. Add ONNX Runtime to the Mixxx/vcpkg manifests only after baseline builds are
-   green.
+1. Begin Phase 2 on `feature/demucs-runner`.
+2. Pin and export the official `mixxxdj/demucs` HTDemucs model.
+3. Validate PyTorch/ONNX parity and publish the model manifest and SHA-256
+   without committing the model binary to Git.
