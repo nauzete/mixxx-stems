@@ -2781,6 +2781,8 @@ if(ONNXRUNTIME)
       "ONNXRUNTIME is enabled, but ONNX Runtime was not found"
     )
   endif()
+  include(OnnxRuntimeTarget)
+  mixxx_ensure_onnxruntime_target()
   target_sources(
     mixxx-lib
     PRIVATE src/stems/demucsonnxrunner.cpp src/stems/demucsonnxrunner.h

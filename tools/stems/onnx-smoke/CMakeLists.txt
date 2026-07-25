@@ -11,6 +11,8 @@ find_package(onnxruntime CONFIG QUIET)
 if(NOT onnxruntime_FOUND)
   find_package(onnxruntime MODULE REQUIRED)
 endif()
+include(OnnxRuntimeTarget)
+mixxx_ensure_onnxruntime_target()
 
 add_executable(
   demucs-onnx-smoke
