@@ -44,6 +44,13 @@ jobs:
             .github/workflows/model-export.yml
             tools/stems/model-export-requirements.txt
 
+      - name: Install audio fixture decoder
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
       - name: Install pinned CPU export toolchain
         run: |
           python -m pip install --upgrade pip==25.2

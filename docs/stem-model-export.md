@@ -4,6 +4,8 @@ The runtime model is exported only from the official
 [`mixxxdj/demucs`](https://github.com/mixxxdj/demucs) fork. The source commit,
 Python version, CPU PyTorch toolchain, ONNX opset, and ONNX Runtime validator
 are pinned in `.github/workflows/model-export.yml`.
+FFmpeg is installed explicitly to decode the upstream MP3 fixture, and its
+resolved version is recorded in the model manifest.
 
 The workflow calls the upstream `scripts/convert-pth-to-onnx.py` exporter and
 then applies project-specific validation. It does not substitute a different

@@ -403,6 +403,15 @@ def distribution_versions() -> dict[str, str]:
     return {name: importlib.metadata.version(name) for name in packages}
 
 
+def executable_version(executable: str) -> str:
+    output = subprocess.check_output(
+        [executable, "-version"],
+        text=True,
+        encoding="utf-8",
+    )
+    return output.splitlines()[0]
+
+
 def write_json(path: Path, data: Any) -> None:
     path.write_text(
         json.dumps(data, indent=2, sort_keys=True) + "\n",
@@ -569,6 +578,10 @@ def main() -> int:
             "python": platform.python_version(),
             "operating_system": "ubuntu-24.04-x86_64",
             "packages": distribution_versions(),
+            "fixture_decoder": {
+                "ffmpeg": executable_version("ffmpeg"),
+                "ffprobe": executable_version("ffprobe"),
+            },
             "random_seed": 0,
         },
         "validation": {
