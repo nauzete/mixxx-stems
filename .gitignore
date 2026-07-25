@@ -35,6 +35,10 @@ compile_commands.json
 /build*
 /install
 
+# Exported stem-separation models are release assets, never Git blobs.
+*.onnx
+/model-export-output/
+
 # Exclude unneeded files from GoogleTest library when updating our bundled
 # GoogleTest library in the lib/ directory
 lib/googletest/docs
