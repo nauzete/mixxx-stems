@@ -175,14 +175,15 @@ def load_core_model():
     return core_model
 
 
-def onnx_tensor_shape(value_info: Any) -> list[int]:
-    shape = []
+def onnx_tensor_shape(value_info: Any) -> list[int | str | None]:
+    shape: list[int | str | None] = []
     for dimension in value_info.type.tensor_type.shape.dim:
-        if not dimension.HasField("dim_value"):
-            raise RuntimeError(
-                f"Dynamic tensor dimension is not supported: {value_info.name}"
-            )
-        shape.append(dimension.dim_value)
+        if dimension.HasField("dim_value"):
+            shape.append(dimension.dim_value)
+        elif dimension.HasField("dim_param"):
+            shape.append(dimension.dim_param)
+        else:
+            shape.append(None)
     return shape
 
 
@@ -198,11 +199,19 @@ def load_and_check_onnx(model_path: Path) -> tuple[Any, dict[str, Any]]:
     output_info = model.graph.output[0]
     input_shape = onnx_tensor_shape(input_info)
     output_shape = onnx_tensor_shape(output_info)
-    if input_shape[:2] != [1, 2]:
+    if input_shape[:2] != [1, 2] or not isinstance(input_shape[-1], int):
         raise RuntimeError(f"Unexpected ONNX input shape: {input_shape!r}")
-    if output_shape[:3] != [1, 4, 2]:
+    if len(output_shape) != 4:
         raise RuntimeError(f"Unexpected ONNX output shape: {output_shape!r}")
-    if output_shape[-1] != input_shape[-1]:
+    for actual, expected in zip(output_shape[:3], [1, 4, 2]):
+        if isinstance(actual, int) and actual != expected:
+            raise RuntimeError(
+                f"Unexpected ONNX output shape: {output_shape!r}"
+            )
+    if (
+        isinstance(output_shape[-1], int)
+        and output_shape[-1] != input_shape[-1]
+    ):
         raise RuntimeError(
             "Input/output sample count mismatch: "
             f"{input_shape!r} -> {output_shape!r}"
@@ -458,6 +467,15 @@ def main() -> int:
         args.mean_absolute_tolerance,
         args.max_absolute_tolerance,
     )
+    runtime_output_shape = [1, len(EXPECTED_SOURCES), 2, input_samples]
+    for fixture_name, fixture_results in parity.items():
+        metrics = fixture_results["pytorch_onnx_path_vs_onnxruntime"]
+        if metrics["reference_shape"] != runtime_output_shape:
+            raise RuntimeError(
+                f"{fixture_name} produced unexpected runtime output shape: "
+                f"{metrics['reference_shape']!r}"
+            )
+    onnx_metadata["output"]["runtime_shape"] = runtime_output_shape
 
     parity_report_path = output_dir / "parity-report.json"
     parity_report = {
