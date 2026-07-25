@@ -2764,6 +2764,31 @@ elseif(BUILD_BENCH AND NOT BUILD_TESTING)
   message(FATAL_ERROR "Benchmark needs Unittests (-DBUILD_TESTING=ON)")
 endif()
 
+# ONNX Runtime support
+find_package(onnxruntime CONFIG QUIET)
+if(NOT onnxruntime_FOUND)
+  find_package(onnxruntime MODULE QUIET)
+endif()
+default_option(
+  ONNXRUNTIME
+  "Enable ONNX Runtime CPU inference for stem separation"
+  "onnxruntime_FOUND;NOT ANDROID"
+)
+if(ONNXRUNTIME)
+  if(NOT onnxruntime_FOUND)
+    message(
+      FATAL_ERROR
+      "ONNXRUNTIME is enabled, but ONNX Runtime was not found"
+    )
+  endif()
+  target_sources(
+    mixxx-lib
+    PRIVATE src/stems/demucsonnxrunner.cpp src/stems/demucsonnxrunner.h
+  )
+  target_link_libraries(mixxx-lib PRIVATE onnxruntime::onnxruntime)
+  target_compile_definitions(mixxx-lib PRIVATE MIXXX_USE_ONNXRUNTIME)
+endif()
+
 # FFmpeg support
 # FFmpeg is multimedia library that can be found http://ffmpeg.org/
 find_package(FFMPEG COMPONENTS libavcodec libavformat libavutil libswresample)
