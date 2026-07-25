@@ -17,12 +17,12 @@
 
 ### Base revisions
 
-| Component | Revision | Synchronization date |
-| --- | --- | --- |
-| Mixxx | `66f7912343c9938339b9d3b12ed7a9fee38d97f5` | 2026-07-25 |
-| Demucs | `d788c1a06876ced89b11d6531f771e5e40204d48` | 2026-07-25 |
-| vcpkg | `41f250c938a7af7ee57bb49f30f94c5355d03c2f` | 2026-07-25 |
-| vcpkg 2.7 dependency line | `1c20f84aa1ffca2ef18a7d9c6bd7cdd1f5f2e265` | 2026-07-25 |
+| Component                 | Revision                                   | Synchronization date |
+| ------------------------- | ------------------------------------------ | -------------------- |
+| Mixxx                     | `66f7912343c9938339b9d3b12ed7a9fee38d97f5` | 2026-07-25           |
+| Demucs                    | `d788c1a06876ced89b11d6531f771e5e40204d48` | 2026-07-25           |
+| vcpkg                     | `41f250c938a7af7ee57bb49f30f94c5355d03c2f` | 2026-07-25           |
+| vcpkg 2.7 dependency line | `1c20f84aa1ffca2ef18a7d9c6bd7cdd1f5f2e265` | 2026-07-25           |
 
 ### Completed work
 
@@ -58,8 +58,8 @@ All feature branches start from the documented integration baseline.
 - Draft integration PR: `https://github.com/nauzete/mixxx-stems/pull/1`
 - Draft native ARM64 packaging PR:
   `https://github.com/nauzete/mixxx-stems/pull/2`
-- Component PRs will target `stems-integration` after their first coherent,
-  buildable change. GitHub does not allow a PR between identical branch tips.
+- Draft HTDemucs model export PR:
+  `https://github.com/nauzete/mixxx-stems/pull/3`
 
 ### Builds and tests
 
@@ -83,23 +83,44 @@ All feature branches start from the documented integration baseline.
   - Microsoft Media Foundation crashes in
     `SoundSourceProxyTest.regressionTestCachingReaderChunkJumpForward` on
     Windows ARM64 (`mixxxdj/mixxx#15638`).
-  Commit `bd7fe8613b` handles both cases without relaxing Windows x64 tests.
+    Commit `bd7fe8613b` handles both cases without relaxing Windows x64 tests.
 - A macOS x64 Audio Unit initialization flake (`mixxxdj/mixxx#16448`) failed
   the first attempt and passed when only failed jobs were rerun.
 - Supplied package integrity passed for all 51 files.
 - Supplied PioneerXDJ-RR Stems scaffold XML is well formed.
-- No ONNX model has been exported or committed.
+- Phase 2 exported HTDemucs with the official
+  `mixxxdj/demucs@d788c1a06876ced89b11d6531f771e5e40204d48` exporter.
+- ONNX full-check and ONNX Runtime CPU parity passed for deterministic
+  synthetic audio and the official Demucs `test.mp3` fixture in run
+  `https://github.com/nauzete/mixxx-stems/actions/runs/30165119169`.
+- The model binary remains outside Git history.
 - No physical hardware test has been run.
 
 ### Phase 1 artifacts
 
-| Artifact | Artifact ID | Size |
-| --- | ---: | ---: |
-| Windows x64 MSI | `8620176208` | 107,307,752 bytes |
-| Ubuntu ARM64 DEB | `8620596995` | 24,817,424 bytes |
+| Artifact         |  Artifact ID |              Size |
+| ---------------- | -----------: | ----------------: |
+| Windows x64 MSI  | `8620176208` | 107,307,752 bytes |
+| Ubuntu ARM64 DEB | `8620596995` |  24,817,424 bytes |
 
 Downloaded Ubuntu ARM64 DEB SHA-256:
 `921a8eacc4a79adff49787ce659ccdabc2b0b2391d4ed2ecb0ddd2d14bd74f86`.
+
+### Phase 2 model artifact
+
+- Release:
+  `https://github.com/nauzete/mixxx-stems/releases/tag/htdemucs-955717e8-onnx-v1`
+- Model: `htdemucs`, version/signature `955717e8`
+- ONNX opset: 17
+- Input: `[1, 2, 343980]` at 44,100 Hz
+- Output: `[1, 4, 2, 343980]`
+- Stem order: drums, bass, other, vocals
+- ONNX size: 304,413,278 bytes
+- ONNX SHA-256:
+  `db37d1314ac1e1051e7978d25ef45b3f1d3f43c837678752f592c0f2deca752d`
+- Real-audio parity maximum absolute error: `0.0012071133` (limit `0.02`)
+- Release assets include the deterministic manifest, parity report, complete
+  checksum file, pinned Python environment, and Demucs MIT license notice.
 
 ### Environment notes and blockers
 
@@ -125,7 +146,7 @@ Downloaded Ubuntu ARM64 DEB SHA-256:
 
 ### Next task
 
-1. Begin Phase 2 on `feature/demucs-runner`.
-2. Pin and export the official `mixxxdj/demucs` HTDemucs model.
-3. Validate PyTorch/ONNX parity and publish the model manifest and SHA-256
-   without committing the model binary to Git.
+1. Begin Phase 3 on `feature/onnx-runtime`.
+2. Integrate the CPU ONNX Runtime dependency through CMake/vcpkg.
+3. Load the verified model and run a small C++ inference on Windows x64 and
+   Ubuntu ARM64.
