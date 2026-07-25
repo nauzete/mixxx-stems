@@ -64,24 +64,42 @@ All feature branches start from the documented integration baseline.
 ### Builds and tests
 
 - Enabled GitHub Actions on the new fork.
-- Clean upstream build run:
-  `https://github.com/nauzete/mixxx-stems/actions/runs/30155976024`
-  - pre-commit passed;
-  - Windows x64 is still running;
-  - Flatpak x86_64 failed while downloading Upower because GitLab returned
-    HTTP 502; this is an external transient download failure;
-  - the paired Flatpak ARM64 job was cancelled by the matrix after that
-    failure.
-- Native DEB ARM64 run:
-  `https://github.com/nauzete/mixxx-stems/actions/runs/30156063234`
-  - workflow parsing and pre-commit passed;
-  - native `ubuntu-24.04-arm` configured successfully and is compiling;
-  - Windows x64 is also running.
+- Phase 1 (clean baseline builds) is complete at commit `bd7fe8613b`.
+- GitHub Actions run
+  `https://github.com/nauzete/mixxx-stems/actions/runs/30159873805`
+  completed successfully on its second attempt, including `Ready to merge`.
+- Windows x64 compiled, passed the configured tests, and generated an MSI.
+- Ubuntu 24.04 ARM64 compiled natively on `ubuntu-24.04-arm`; all 1,265
+  enabled tests passed.
+- The ARM64 job confirmed:
+  - runner architecture: `aarch64`;
+  - Debian package architecture: `arm64`;
+  - packaged executable: `ELF 64-bit LSB ... ARM aarch64`.
+- Windows ARM64 also compiled, passed its configured tests, and generated an
+  ARM64 MSI. This is additional coverage, not a product target.
+- The first run exposed two known upstream architecture-specific failures:
+  - libmad `FPM_DEFAULT` produces the documented first-sound sample 3,326 on
+    Ubuntu ARM64;
+  - Microsoft Media Foundation crashes in
+    `SoundSourceProxyTest.regressionTestCachingReaderChunkJumpForward` on
+    Windows ARM64 (`mixxxdj/mixxx#15638`).
+  Commit `bd7fe8613b` handles both cases without relaxing Windows x64 tests.
+- A macOS x64 Audio Unit initialization flake (`mixxxdj/mixxx#16448`) failed
+  the first attempt and passed when only failed jobs were rerun.
 - Supplied package integrity passed for all 51 files.
 - Supplied PioneerXDJ-RR Stems scaffold XML is well formed.
-- No package artifact has been generated yet.
 - No ONNX model has been exported or committed.
 - No physical hardware test has been run.
+
+### Phase 1 artifacts
+
+| Artifact | Artifact ID | Size |
+| --- | ---: | ---: |
+| Windows x64 MSI | `8620176208` | 107,307,752 bytes |
+| Ubuntu ARM64 DEB | `8620596995` | 24,817,424 bytes |
+
+Downloaded Ubuntu ARM64 DEB SHA-256:
+`921a8eacc4a79adff49787ce659ccdabc2b0b2391d4ed2ecb0ddd2d14bd74f86`.
 
 ### Environment notes and blockers
 
@@ -107,6 +125,7 @@ All feature branches start from the documented integration baseline.
 
 ### Next task
 
-1. Establish clean Windows x64 and Ubuntu 24.04 ARM64 baseline build workflows.
-2. Add ONNX Runtime to the Mixxx/vcpkg manifests only after baseline builds are
-   green.
+1. Begin Phase 2 on `feature/demucs-runner`.
+2. Pin and export the official `mixxxdj/demucs` HTDemucs model.
+3. Validate PyTorch/ONNX parity and publish the model manifest and SHA-256
+   without committing the model binary to Git.
