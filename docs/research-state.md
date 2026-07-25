@@ -13,6 +13,7 @@ rechecked before reusing unmerged code.
 | `mixxxdj/mixxx` | `main` | `66f7912343c9938339b9d3b12ed7a9fee38d97f5` |
 | `mixxxdj/demucs` | `main` | `d788c1a06876ced89b11d6531f771e5e40204d48` |
 | `mixxxdj/vcpkg` | `main` | `41f250c938a7af7ee57bb49f30f94c5355d03c2f` |
+| `mixxxdj/vcpkg` | `2.7` dependency line | `1c20f84aa1ffca2ef18a7d9c6bd7cdd1f5f2e265` |
 
 Mixxx identifies this revision as 2.7.0-alpha. New functionality therefore
 targets `main`; branch 2.6 is retained only for comparison.
@@ -34,7 +35,11 @@ targets `main`; branch 2.6 is retained only for comparison.
   `moov/udta/stem` JSON atom but `main` does not provide a stem container
   writer.
 - No ONNX or ONNX Runtime dependency or C++ inference implementation exists in
-  the Mixxx CMake project or vcpkg manifest.
+  the Mixxx CMake project.
+- The CPU `onnxruntime` 1.23.2 port is present on `mixxxdj/vcpkg:2.7` and
+  `master`, but not on `mixxxdj/vcpkg:main`. Mixxx 2.7 dependency work must
+  therefore use the current `2.7` line rather than assuming that `main`
+  contains the port.
 - The library schema in `main` still assumes one physical location per logical
   track. Alternate-source linking must not be implemented against unmerged PR
   APIs without adaptation.
@@ -56,7 +61,7 @@ targets `main`; branch 2.6 is retained only for comparison.
 | `mixxxdj/mixxx#15891` | Open against 2.6, dirty merge state | Python HTDemucs plus MP4Box is incompatible with this fork's C++ runtime requirement. |
 | `mixxxdj/mixxx#16305` | Open, blocked | Proposed 1-to-N `track_locations` foundation is not in `main`. |
 | `mixxxdj/mixxx#16756` | Open, blocked | Optional stacked stem waveforms are not in `main`. |
-| `mixxxdj/vcpkg#194` | Merged | Mixxx vcpkg has absorbed upstream ONNX Runtime port history. |
+| `mixxxdj/vcpkg#194` | Merged into 2.7 | The CPU ONNX Runtime port is available on the Mixxx 2.7 dependency line, not `main`. |
 | `microsoft/vcpkg#36850` | Merged | The upstream ONNX Runtime port exists. Mixxx still needs manifest/build integration. |
 
 ## Demucs export contract
