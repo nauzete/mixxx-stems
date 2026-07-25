@@ -56,9 +56,9 @@ All feature branches start from the documented integration baseline.
 ### Pull requests
 
 - Draft integration PR: `https://github.com/nauzete/mixxx-stems/pull/1`
-- Draft native ARM64 packaging PR:
+- Merged native ARM64 packaging PR:
   `https://github.com/nauzete/mixxx-stems/pull/2`
-- Draft HTDemucs model export PR:
+- Merged HTDemucs model export PR:
   `https://github.com/nauzete/mixxx-stems/pull/3`
 
 ### Builds and tests
@@ -92,7 +92,11 @@ All feature branches start from the documented integration baseline.
   `mixxxdj/demucs@d788c1a06876ced89b11d6531f771e5e40204d48` exporter.
 - ONNX full-check and ONNX Runtime CPU parity passed for deterministic
   synthetic audio and the official Demucs `test.mp3` fixture in run
-  `https://github.com/nauzete/mixxx-stems/actions/runs/30165119169`.
+  `https://github.com/nauzete/mixxx-stems/actions/runs/30167727897`.
+- The final combined Phase 1 and Phase 2 commit passed the complete Mixxx
+  Actions matrix, including `Ready to merge`, in run
+  `https://github.com/nauzete/mixxx-stems/actions/runs/30167727961`.
+- Phases 1 and 2 are integrated at `66e612aaf7fbd9f8477a80928657f34eb4522295`.
 - The model binary remains outside Git history.
 - No physical hardware test has been run.
 
