@@ -23,6 +23,7 @@ from torch.nn import functional as F
 
 MODEL_NAME = "htdemucs"
 MODEL_SIGNATURE = "955717e8"
+MODEL_VERSION = MODEL_SIGNATURE
 MODEL_CHECKPOINT = "955717e8-8726e21a.th"
 MODEL_CHECKPOINT_URL = (
     "https://dl.fbaipublicfiles.com/demucs/"
@@ -499,6 +500,9 @@ def main() -> int:
     pip_freeze_path = output_dir / "pip-freeze.txt"
     write_pip_freeze(pip_freeze_path)
 
+    demucs_license_path = output_dir / "demucs-LICENSE"
+    demucs_license_path.write_bytes((demucs_dir / "LICENSE").read_bytes())
+
     checkpoint_path = (
         Path(torch.hub.get_dir()) / "checkpoints" / MODEL_CHECKPOINT
     )
@@ -514,6 +518,7 @@ def main() -> int:
         "format_version": FORMAT_VERSION,
         "model": {
             "name": MODEL_NAME,
+            "version": MODEL_VERSION,
             "signature": MODEL_SIGNATURE,
             "sample_rate": sample_rate,
             "audio_channels": int(core_model.audio_channels),
@@ -548,6 +553,7 @@ def main() -> int:
             },
             "license": {
                 "identifier": "MIT",
+                "artifact": demucs_license_path.name,
                 "source": (
                     "https://github.com/mixxxdj/demucs/blob/"
                     f"{source['commit']}/LICENSE"
@@ -603,6 +609,7 @@ def main() -> int:
         manifest_path,
         parity_report_path,
         pip_freeze_path,
+        demucs_license_path,
     ]
     checksums_path = output_dir / "SHA256SUMS"
     checksums_path.write_text(

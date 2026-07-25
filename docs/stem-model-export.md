@@ -19,6 +19,7 @@ The workflow uploads an artifact containing:
 - `model-manifest.json`;
 - `parity-report.json`;
 - `pip-freeze.txt`;
+- `demucs-LICENSE`;
 - `SHA256SUMS`.
 
 The ONNX binary is a release artifact and is ignored by Git.
