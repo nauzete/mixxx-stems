@@ -71,6 +71,28 @@ jobs:
             artifacts_name: Ubuntu 24.04 Qt6 DEB
             artifacts_path: build/*.deb
             artifacts_slug: ubuntu-jammy
+          - name: Ubuntu 24.04 ARM64
+            os: ubuntu-24.04-arm
+            cmake_args: >-
+              -DQT6=ON
+              -DQML=ON
+              -DBULK=ON
+              -DFFMPEG=ON
+              -DLOCALECOMPARE=ON
+              -DMAD=ON
+              -DMODPLUG=ON
+              -DWAVPACK=ON
+              -DINSTALL_USER_UDEV_RULES=OFF
+            ctest_args: []
+            compiler_cache: ccache
+            compiler_cache_path: /home/runner/.cache/ccache
+            compiler_cache_id: qt6-arm64
+            cpack_generator: DEB
+            buildenv_basepath: /home/runner/buildenv
+            buildenv_script: tools/debian_buildenv.sh
+            artifacts_name: Ubuntu 24.04 ARM64 Qt6 DEB
+            artifacts_path: build/*.deb
+            artifacts_slug: ubuntu-noble-arm64
           - name: macOS 15 x64
             os: macos-15-intel
             cmake_args: >-
@@ -502,6 +524,25 @@ jobs:
         with:
           name: ${{ matrix.os }}-logs-packages-wix
           path: ${{ github.workspace }}/build/_CPack_Packages/win64/WIX/wix.log
+
+      - name: "[Ubuntu ARM64] Validate package architecture"
+        if: matrix.name == 'Ubuntu 24.04 ARM64'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = "aarch64"
+
+          package="$(find build -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          test -n "${package}"
+          test "$(dpkg-deb -f "${package}" Architecture)" = "arm64"
+
+          extract_dir="${RUNNER_TEMP}/mixxx-arm64-package"
+          mkdir -p "${extract_dir}"
+          dpkg-deb -x "${package}" "${extract_dir}"
+          binary="$(find "${extract_dir}" -type f -name mixxx -print -quit)"
+          test -n "${binary}"
+          file "${binary}"
+          file "${binary}" | grep -Eq 'ELF 64-bit LSB.*ARM aarch64'
 
       - name: "[Ubuntu] Import PPA GPG key"
         if: startsWith(matrix.os, 'ubuntu') && matrix.crosscompile != true && env.RRYAN_AT_MIXXX_DOT_ORG_GPG_PRIVATE_KEY != null
