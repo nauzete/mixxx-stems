@@ -60,6 +60,10 @@ All feature branches start from the documented integration baseline.
   `https://github.com/nauzete/mixxx-stems/pull/2`
 - Merged HTDemucs model export PR:
   `https://github.com/nauzete/mixxx-stems/pull/3`
+- Draft ONNX Runtime C++ integration PR:
+  `https://github.com/nauzete/mixxx-stems/pull/4`
+- Draft ONNX Runtime dependency validation PR:
+  `https://github.com/nauzete/vcpkg-mixxx-stems/pull/1`
 
 ### Builds and tests
 
@@ -98,6 +102,26 @@ All feature branches start from the documented integration baseline.
   `https://github.com/nauzete/mixxx-stems/actions/runs/30167727961`.
 - Phases 1 and 2 are integrated at `66e612aaf7fbd9f8477a80928657f34eb4522295`.
 - The model binary remains outside Git history.
+- Phase 3 integrates ONNX Runtime 1.23.2 CPU through the Mixxx vcpkg fork and
+  CMake target `onnxruntime::onnxruntime`.
+- `DemucsOnnxRunner` loads the published HTDemucs model, validates the exact
+  input/output tensor contract and stem order, and executes synchronous CPU
+  inference for use only from a background worker.
+- The dedicated C++ smoke test downloaded the release model, verified its
+  SHA-256, compiled the same runner source, and completed real-model inference
+  on Windows x64 and native Ubuntu 24.04 ARM64:
+  `https://github.com/nauzete/mixxx-stems/actions/runs/30173562764`.
+- The complete Mixxx Actions matrix passed, including all builds, tests,
+  static analysis, formatting, and `Ready to merge`:
+  `https://github.com/nauzete/mixxx-stems/actions/runs/30173562848`.
+- The focused vcpkg port validation passed on Windows x64 and native Ubuntu
+  24.04 ARM64:
+  `https://github.com/nauzete/vcpkg-mixxx-stems/actions/runs/30171701454`.
+- The first native ARM64 smoke build exposed an ONNX Runtime 1.23.2 static
+  CMake export that omitted its public-header directory. Commit `96fd5d8710`
+  normalizes the imported target without changing the dependency or runner.
+- Phase 3 is complete at Mixxx commit `96fd5d8710` and vcpkg commit
+  `5f091759f`.
 - No physical hardware test has been run.
 
 ### Phase 1 artifacts
@@ -150,7 +174,9 @@ Downloaded Ubuntu ARM64 DEB SHA-256:
 
 ### Next task
 
-1. Begin Phase 3 on `feature/onnx-runtime`.
-2. Integrate the CPU ONNX Runtime dependency through CMake/vcpkg.
-3. Load the verified model and run a small C++ inference on Windows x64 and
-   Ubuntu ARM64.
+1. Merge the validated Phase 3 component branches into their integration
+   branches.
+2. Begin Phase 4 on `feature/demucs-runner`.
+3. Implement bounded decoding, normalization, segmentation, overlap-add,
+   reusable buffers, progress, and cancellation without touching the audio
+   thread.
