@@ -38,8 +38,25 @@
 
 - `main`: synchronized with `mixxxdj/mixxx:main`.
 - `stems-integration`: active integration branch.
-- Feature branches: pending creation after this bootstrap commit so every
-  branch starts from the documented integration baseline.
+- `feature/onnx-runtime`
+- `feature/demucs-runner`
+- `feature/stem-container`
+- `feature/stem-cache`
+- `feature/background-queue`
+- `feature/library-integration`
+- `feature/stem-controls`
+- `feature/stem-ui`
+- `feature/flx4-stems`
+- `feature/windows-packaging`
+- `feature/arm64-packaging`
+
+All feature branches start from the documented integration baseline.
+
+### Pull requests
+
+- Draft integration PR: `https://github.com/nauzete/mixxx-stems/pull/1`
+- Component PRs will target `stems-integration` after their first coherent,
+  buildable change. GitHub does not allow a PR between identical branch tips.
 
 ### Builds and tests
 
@@ -66,7 +83,6 @@
 
 ### Next task
 
-1. Publish this bootstrap commit and create the required feature branches.
-2. Establish clean Windows x64 and Ubuntu 24.04 ARM64 baseline build workflows.
-3. Add ONNX Runtime to the Mixxx/vcpkg manifests only after baseline builds are
+1. Establish clean Windows x64 and Ubuntu 24.04 ARM64 baseline build workflows.
+2. Add ONNX Runtime to the Mixxx/vcpkg manifests only after baseline builds are
    green.
