@@ -185,8 +185,12 @@ jobs:
               -DVCPKG_DEFAULT_HOST_TRIPLET=arm64-windows-release
             cc: cl
             cxx: cl
-            # TODO: Fix these broken tests on Windows
-            ctest_args: --exclude-regex '^AutoDJProcessorTest.*$'
+            # TODO: Fix these broken tests on Windows.
+            # Media Foundation crashes in the caching reader test on Windows ARM64:
+            # https://github.com/mixxxdj/mixxx/issues/15638
+            ctest_args: >-
+              --exclude-regex
+              '^(AutoDJProcessorTest.*|SoundSourceProxyTest.regressionTestCachingReaderChunkJumpForward)$'
             cpack_generator: WIX
             buildenv_basepath: C:\buildenv
             buildenv_script: tools/windows_buildenv.bat
