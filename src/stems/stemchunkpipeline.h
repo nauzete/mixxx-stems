@@ -80,7 +80,7 @@ class StemChunkPipeline final {
             std::size_t outputOffset,
             std::size_t chunkFrameCount,
             const Statistics& statistics);
-    void emit(std::size_t frameOffset,
+    void emitChunk(std::size_t frameOffset,
             std::size_t frameCount,
             const WriteCallback& write);
     void shiftAccumulator();

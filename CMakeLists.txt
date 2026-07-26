@@ -2876,6 +2876,8 @@ if(STEM)
     mixxx-lib
     PRIVATE
       src/sources/soundsourcestem.cpp
+      src/stems/stemcontainerwriter.cpp
+      src/stems/stemcontainerwriter.h
       src/track/steminfoimporter.cpp
       src/track/steminfo.cpp
       src/widget/wtrackstemmenu.cpp
@@ -3017,6 +3019,7 @@ if(BUILD_TESTING)
       src/test/stemtest.cpp
       src/test/steminfotest.cpp
       src/test/stemcontrolobjecttest.cpp
+      src/test/stemcontainerwritertest.cpp
     )
   endif()
   if(BUILD_BENCH)

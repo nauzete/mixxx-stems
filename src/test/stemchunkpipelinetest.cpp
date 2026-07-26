@@ -1,5 +1,3 @@
-#include "stems/stemchunkpipeline.h"
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -7,6 +5,8 @@
 #include <numbers>
 #include <stdexcept>
 #include <vector>
+
+#include "stems/stemchunkpipeline.h"
 
 namespace mixxx::stems {
 namespace {
@@ -69,7 +69,8 @@ TEST(StemChunkPipelineTest, ReconstructsAcrossOverlapAndFinalPadding) {
     StemChunkPipeline pipeline(runner);
     const auto capacityBefore = pipeline.allocatedSampleCapacity();
 
-    const auto result = pipeline.run(frameCount,
+    const auto result = pipeline.run(
+            frameCount,
             [&](std::size_t offset, std::span<float> destination) {
                 ASSERT_EQ(destination.size() % kChannelCount, 0U);
                 const auto readFrameCount =
@@ -93,9 +94,7 @@ TEST(StemChunkPipelineTest, ReconstructsAcrossOverlapAndFinalPadding) {
                 }
                 expectedWriteOffset += writeFrameCount;
             },
-            [&](float progress) {
-                progressValues.push_back(progress);
-            });
+            [&](float progress) { progressValues.push_back(progress); });
 
     EXPECT_EQ(result, StemChunkPipeline::Result::Completed);
     EXPECT_EQ(expectedWriteOffset, frameCount);
@@ -128,7 +127,8 @@ TEST(StemChunkPipelineTest, CancelsBeforeInference) {
     StemChunkPipeline pipeline(runner);
     bool cancel = false;
 
-    const auto result = pipeline.run(frameCount,
+    const auto result = pipeline.run(
+            frameCount,
             [&](std::size_t offset, std::span<float> destination) {
                 std::copy_n(input.begin() + offset * kChannelCount,
                         destination.size(),
@@ -137,12 +137,8 @@ TEST(StemChunkPipelineTest, CancelsBeforeInference) {
             [](std::size_t, std::size_t, std::span<const float>) {
                 throw std::logic_error("Cancelled pipeline wrote output");
             },
-            [&](float progress) {
-                cancel = progress >= 0.1F;
-            },
-            [&] {
-                return cancel;
-            });
+            [&](float progress) { cancel = progress >= 0.1F; },
+            [&] { return cancel; });
 
     EXPECT_EQ(result, StemChunkPipeline::Result::Cancelled);
     EXPECT_EQ(runner.m_runCount, 0U);
