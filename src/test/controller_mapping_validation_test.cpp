@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <QApplication>
+#include <QFile>
 #include <QRegularExpression>
 #include <QUrl>
 
@@ -255,6 +256,80 @@ bool lintMappingInfo(const MappingInfo& mapping) {
         result = false;
     }
     return result;
+}
+
+QString readControllerResource(const QString& fileName) {
+    QFile file(QDir(RESOURCE_FOLDER "/controllers").filePath(fileName));
+    if (!file.open(QIODevice::ReadOnly)) {
+        return {};
+    }
+    return QString::fromUtf8(file.readAll());
+}
+
+QStringList midiInputAddresses(const QString& xml) {
+    QStringList addresses;
+    const QRegularExpression controlPattern(
+            QStringLiteral("<control>([\\s\\S]*?)</control>"));
+    const QRegularExpression statusPattern(
+            QStringLiteral("<status>([^<]+)</status>"));
+    const QRegularExpression midiNoPattern(
+            QStringLiteral("<midino>([^<]+)</midino>"));
+    auto controls = controlPattern.globalMatch(xml);
+    while (controls.hasNext()) {
+        const auto control = controls.next().captured(1);
+        const auto status = statusPattern.match(control);
+        const auto midiNo = midiNoPattern.match(control);
+        if (status.hasMatch() && midiNo.hasMatch()) {
+            addresses.append(status.captured(1) + ":" +
+                    midiNo.captured(1));
+        }
+    }
+    return addresses;
+}
+
+TEST(ControllerMappingValidationTest, PioneerDdjFlx4StemsVariant) {
+    const auto officialXml = readControllerResource(
+            QStringLiteral("Pioneer-DDJ-FLX4.midi.xml"));
+    const auto stemsXml = readControllerResource(
+            QStringLiteral("Pioneer-DDJ-FLX4-Stems.midi.xml"));
+    const auto stemsScript = readControllerResource(
+            QStringLiteral("Pioneer-DDJ-FLX4-Stems-script.js"));
+
+    ASSERT_FALSE(officialXml.isEmpty());
+    ASSERT_FALSE(stemsXml.isEmpty());
+    ASSERT_FALSE(stemsScript.isEmpty());
+    EXPECT_TRUE(stemsXml.contains(
+            QStringLiteral("<name>Pioneer DDJ-FLX4 Stems</name>")));
+    EXPECT_TRUE(stemsXml.contains(QStringLiteral(
+            "functionprefix=\"PioneerDDJFLX4Stems\" "
+            "filename=\"Pioneer-DDJ-FLX4-Stems-script.js\"")));
+    EXPECT_TRUE(stemsScript.contains(
+            QStringLiteral("var PioneerDDJFLX4Stems = {};")));
+    EXPECT_FALSE(stemsXml.contains(
+            QRegularExpression(QStringLiteral(
+                    "PioneerDDJFLX4(?:\\.|\\s*=)"))));
+    EXPECT_FALSE(stemsScript.contains(
+            QRegularExpression(QStringLiteral(
+                    "PioneerDDJFLX4(?:\\.|\\s*=)"))));
+
+    for (const auto& binding : {
+                 QStringLiteral("stemsPadsModesStatus"),
+                 QStringLiteral("stemMutePadsFirstControl"),
+                 QStringLiteral("stemFxPadsFirstControl"),
+                 QStringLiteral("stemMutePadPressed"),
+                 QStringLiteral("stemFxPadPressed"),
+                 QStringLiteral("separation_trigger"),
+                 QStringLiteral("separation_cancel"),
+                 QStringLiteral("separation_state"),
+                 QStringLiteral("sendKeepAlive"),
+         }) {
+        EXPECT_TRUE(stemsScript.contains(binding)) << binding;
+    }
+
+    // The variant changes handlers, never MIDI addresses. This guards against
+    // adding a binding that collides with an existing normal/Shift message.
+    EXPECT_EQ(midiInputAddresses(officialXml),
+            midiInputAddresses(stemsXml));
 }
 
 std::string PrintMappingName(const ::testing::TestParamInfo<std::string>& info) {
