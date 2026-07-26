@@ -5,30 +5,9 @@
 #include <iostream>
 #include <numbers>
 #include <stdexcept>
-#include <vector>
 
 #include "stems/demucsonnxrunner.h"
-
-namespace {
-
-std::vector<float> makeInput() {
-    using mixxx::stems::DemucsOnnxRunner;
-
-    std::vector<float> input(DemucsOnnxRunner::kInputElementCount);
-    for (std::size_t sample = 0;
-            sample < DemucsOnnxRunner::kSegmentSampleCount;
-            ++sample) {
-        const auto time = static_cast<double>(sample) / 44100.0;
-        input[sample] = static_cast<float>(
-                0.1 * std::sin(2.0 * std::numbers::pi * 440.0 * time));
-        input[DemucsOnnxRunner::kSegmentSampleCount + sample] =
-                static_cast<float>(
-                        0.1 * std::sin(2.0 * std::numbers::pi * 660.0 * time));
-    }
-    return input;
-}
-
-} // namespace
+#include "stems/stemchunkpipeline.h"
 
 int main(int argc, char** argv) {
     if (argc != 2) {
@@ -44,26 +23,66 @@ int main(int argc, char** argv) {
         }
 
         mixxx::stems::DemucsOnnxRunner runner(modelPath);
-        const auto input = makeInput();
-        const auto output = runner.run(input);
-        if (!std::all_of(output.begin(), output.end(), [](float sample) {
-                return std::isfinite(sample);
-            })) {
+        mixxx::stems::StemChunkPipeline pipeline(runner);
+        const auto frameCount =
+                mixxx::stems::StemChunkPipeline::kStrideSampleCount + 1024;
+        std::size_t writtenFrameCount = 0;
+        float maximumAbsoluteOutput = 0.0F;
+        float finalProgress = 0.0F;
+        const auto result = pipeline.run(
+                frameCount,
+                [](std::size_t offset, std::span<float> destination) {
+                    for (std::size_t sample = 0;
+                            sample < destination.size() / 2;
+                            ++sample) {
+                        const auto time =
+                                static_cast<double>(offset + sample) / 44100.0;
+                        destination[sample * 2] = static_cast<float>(
+                                0.1 * std::sin(2.0 * std::numbers::pi * 440.0 * time));
+                        destination[sample * 2 + 1] = static_cast<float>(
+                                0.1 * std::sin(2.0 * std::numbers::pi * 660.0 * time));
+                    }
+                },
+                [&](std::size_t offset,
+                        std::size_t outputFrameCount,
+                        std::span<const float> output) {
+                    if (offset != writtenFrameCount ||
+                            !std::all_of(output.begin(),
+                                    output.end(),
+                                    [](float sample) {
+                                        return std::isfinite(sample);
+                                    })) {
+                        throw std::runtime_error(
+                                "Chunk pipeline returned invalid output");
+                    }
+                    for (const auto sample : output) {
+                        maximumAbsoluteOutput =
+                                std::max(maximumAbsoluteOutput,
+                                        std::abs(sample));
+                    }
+                    writtenFrameCount += outputFrameCount;
+                },
+                [&](float progress) {
+                    if (progress < finalProgress) {
+                        throw std::runtime_error(
+                                "Chunk pipeline progress moved backwards");
+                    }
+                    finalProgress = progress;
+                });
+        if (result !=
+                        mixxx::stems::StemChunkPipeline::Result::Completed ||
+                writtenFrameCount != frameCount || finalProgress != 1.0F) {
             throw std::runtime_error(
-                    "ONNX Runtime output contains non-finite samples");
+                    "Chunk pipeline did not complete the entire input");
         }
 
-        const auto maxSample = std::max_element(
-                output.begin(), output.end(), [](float left, float right) {
-                    return std::abs(left) < std::abs(right);
-                });
         std::cout << "ONNX Runtime " << runner.runtimeVersion() << '\n'
                   << "Input tensor: "
                   << runner.contract().inputName << " [1, 2, 343980]\n"
                   << "Output tensor: "
                   << runner.contract().outputName << " [1, 4, 2, 343980]\n"
-                  << "Output elements: " << output.size() << '\n'
-                  << "Maximum absolute output: " << std::abs(*maxSample)
+                  << "Separated frames: " << writtenFrameCount << '\n'
+                  << "Maximum absolute output: " << maximumAbsoluteOutput
                   << '\n';
         return 0;
     } catch (const std::exception& exception) {

@@ -17,6 +17,7 @@ mixxx_ensure_onnxruntime_target()
 add_executable(
   demucs-onnx-smoke
   ../../../src/stems/demucsonnxrunner.cpp
+  ../../../src/stems/stemchunkpipeline.cpp
   main.cpp
 )
 target_compile_features(demucs-onnx-smoke PRIVATE cxx_std_20)

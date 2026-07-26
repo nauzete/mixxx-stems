@@ -2765,6 +2765,13 @@ elseif(BUILD_BENCH AND NOT BUILD_TESTING)
 endif()
 
 # ONNX Runtime support
+target_sources(
+  mixxx-lib
+  PRIVATE
+    src/stems/stemchunkpipeline.cpp
+    src/stems/stemchunkpipeline.h
+    src/stems/steminferencerunner.h
+)
 find_package(onnxruntime CONFIG QUIET)
 if(NOT onnxruntime_FOUND)
   find_package(onnxruntime MODULE QUIET)
@@ -2979,6 +2986,7 @@ if(BUILD_TESTING)
     src/test/signalpathtest.cpp
     src/test/skincontext_test.cpp
     src/test/softtakeover_test.cpp
+    src/test/stemchunkpipelinetest.cpp
     src/test/soundproxy_test.cpp
     src/test/soundsourceproviderregistrytest.cpp
     src/test/sqliteliketest.cpp
