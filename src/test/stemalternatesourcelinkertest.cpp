@@ -1,10 +1,10 @@
-#include "stems/stemalternatesourcelinker.h"
+#include <gtest/gtest.h>
 
 #include <QDir>
 #include <QFile>
 #include <QTemporaryDir>
 
-#include <gtest/gtest.h>
+#include "stems/stemalternatesourcelinker.h"
 
 namespace mixxx::stems {
 namespace {

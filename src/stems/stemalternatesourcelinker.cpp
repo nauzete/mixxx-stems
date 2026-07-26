@@ -1,7 +1,5 @@
 #include "stems/stemalternatesourcelinker.h"
 
-#include <algorithm>
-
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -12,6 +10,7 @@
 #include <QMutexLocker>
 #include <QRegularExpression>
 #include <QSaveFile>
+#include <algorithm>
 
 #include "util/logger.h"
 
@@ -73,6 +72,10 @@ bool StemAlternateSourceLinker::registerCompleted(
     if (!checkInitialized(pErrorMessage)) {
         return false;
     }
+    m_links.clear();
+    if (!loadIndex(pErrorMessage)) {
+        return false;
+    }
     const QFileInfo sourceInfo(sourceFilePath);
     const QFileInfo representationInfo(
             representationPath(entryId));
@@ -105,6 +108,10 @@ StemAlternateSourceLinker::resolve(
     if (!checkInitialized(pErrorMessage)) {
         return std::nullopt;
     }
+    m_links.clear();
+    if (!loadIndex(pErrorMessage)) {
+        return std::nullopt;
+    }
     const auto sourcePath =
             normalizedSourcePath(sourceFilePath);
     auto link = m_links.find(sourcePath);
@@ -134,6 +141,10 @@ bool StemAlternateSourceLinker::removeEntry(
         QString* pErrorMessage) {
     const QMutexLocker locker(&m_mutex);
     if (!checkInitialized(pErrorMessage)) {
+        return false;
+    }
+    m_links.clear();
+    if (!loadIndex(pErrorMessage)) {
         return false;
     }
     bool changed = false;

@@ -1,10 +1,9 @@
 #pragma once
 
-#include <optional>
-
 #include <QHash>
 #include <QMutex>
 #include <QString>
+#include <optional>
 
 namespace mixxx::stems {
 
