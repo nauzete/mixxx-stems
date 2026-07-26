@@ -5745,6 +5745,15 @@ if(WIN32)
     CPACK_WIX_PATCH_FILE
     "${CMAKE_CURRENT_BINARY_DIR}/packaging/wix/MixxxUpgradePatch.xml"
   )
+  configure_file(
+    cmake/modules/RemoveDuplicateOnnxRuntimeForWix.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/RemoveDuplicateOnnxRuntimeForWix.cmake"
+    @ONLY
+  )
+  set(
+    CPACK_PRE_BUILD_SCRIPTS
+    "${CMAKE_CURRENT_BINARY_DIR}/RemoveDuplicateOnnxRuntimeForWix.cmake"
+  )
 
   # uses CMAKE_PROJECT_VERSION
   configure_file(packaging/wix/LICENSE.rtf.in packaging/wix/LICENSE.rtf @ONLY)

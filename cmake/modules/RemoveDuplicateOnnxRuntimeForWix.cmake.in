@@ -1,0 +1,10 @@
+# CPack installs component-owned files once in the default component and once in
+# their named component. WiX requires every component GUID to be unique, so keep
+# the applocal copy of the ONNX Runtime DLL when both copies are staged.
+set(_onnxruntime_unspecified
+    "\${CPACK_TEMPORARY_DIRECTORY}/Unspecified/onnxruntime.dll")
+set(_onnxruntime_applocal
+    "\${CPACK_TEMPORARY_DIRECTORY}/applocal/onnxruntime.dll")
+if(EXISTS "${_onnxruntime_unspecified}" AND EXISTS "${_onnxruntime_applocal}")
+  file(REMOVE "${_onnxruntime_unspecified}")
+endif()
