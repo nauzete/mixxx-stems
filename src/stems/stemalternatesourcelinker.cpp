@@ -11,6 +11,7 @@
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <algorithm>
+#include <utility>
 
 #include "util/logger.h"
 
@@ -230,7 +231,7 @@ bool StemAlternateSourceLinker::saveIndex(
     QJsonArray links;
     QStringList sourcePaths = m_links.keys();
     std::sort(sourcePaths.begin(), sourcePaths.end());
-    for (const auto& sourcePath : sourcePaths) {
+    for (const auto& sourcePath : std::as_const(sourcePaths)) {
         const auto& link = m_links[sourcePath];
         links.append(QJsonObject{
                 {QStringLiteral("source_path"), sourcePath},

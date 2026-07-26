@@ -304,7 +304,7 @@ TEST(ControllerMappingValidationTest, PioneerDdjFlx4StemsVariant) {
             "functionprefix=\"PioneerDDJFLX4Stems\" "
             "filename=\"Pioneer-DDJ-FLX4-Stems-script.js\"")));
     EXPECT_TRUE(stemsScript.contains(
-            QStringLiteral("var PioneerDDJFLX4Stems = {};")));
+            QStringLiteral("const PioneerDDJFLX4Stems = {};")));
     EXPECT_FALSE(stemsXml.contains(
             QRegularExpression(QStringLiteral(
                     "PioneerDDJFLX4(?:\\.|\\s*=)"))));

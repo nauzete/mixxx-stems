@@ -129,7 +129,7 @@ class StemSeparationManager final : public QObject {
     void insertQueued(const QString& jobId);
     void startNext();
     void runJob(const QString& jobId,
-            StemSeparationRequest request,
+            const StemSeparationRequest& request,
             std::shared_ptr<Cancellation> pCancellation);
     void publishState(
             const QString& jobId, StemSeparationState state);

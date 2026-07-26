@@ -69,7 +69,7 @@ class StemCache final {
     };
 
     explicit StemCache(QString directoryPath);
-    StemCache(QString directoryPath, Limits limits);
+    StemCache(QString directoryPath, const Limits& limits);
 
     bool initialize(QString* pErrorMessage = nullptr);
 

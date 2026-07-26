@@ -8,6 +8,7 @@
 #include <functional>
 
 #include "control/controlobject.h"
+#include "control/controlproxy.h"
 #include "mixer/basetrackplayer.h"
 #include "stems/stemstatuscontrolprovider.h"
 #include "test/mixxxtest.h"
@@ -165,12 +166,11 @@ TEST_F(StemStatusControlProviderTest,
             1.0);
 
     QVector<double> observedProgress;
-    auto* pPercentage = ControlObject::getControl(ConfigKey(
+    ControlProxy percentageProxy(ConfigKey(
             deck.getGroup(),
             QStringLiteral("separation_percentage")));
-    ASSERT_NE(pPercentage, nullptr);
-    QObject::connect(pPercentage,
-            &ControlObject::valueChanged,
+    ASSERT_TRUE(percentageProxy.valid());
+    percentageProxy.connectValueChanged(
             &provider,
             [&](double value) {
                 observedProgress.push_back(value);

@@ -134,7 +134,8 @@ StemCache::StemCache(QString directoryPath)
         : StemCache(std::move(directoryPath), Limits{}) {
 }
 
-StemCache::StemCache(QString directoryPath, Limits limits)
+StemCache::StemCache(
+        QString directoryPath, const Limits& limits)
         : m_directoryPath(
                   QDir::cleanPath(std::move(directoryPath))),
           m_limits(limits) {
@@ -445,7 +446,7 @@ bool StemCache::saveIndex(QString* pErrorMessage) const {
     QJsonArray entries;
     QStringList entryIds = m_entries.keys();
     std::sort(entryIds.begin(), entryIds.end());
-    for (const auto& entryId : entryIds) {
+    for (const auto& entryId : std::as_const(entryIds)) {
         const auto& entry = m_entries[entryId];
         entries.append(QJsonObject{
                 {QStringLiteral("id"), entryId},

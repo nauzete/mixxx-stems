@@ -208,7 +208,7 @@ TEST_F(SoundSourceProxyTest,
     const auto logicalFilePath =
             getTestFile(QStringLiteral(".flac"));
     const auto alternateFilePath =
-            getTestFile(QStringLiteral(".stem.mp4"));
+            getTestFile(QStringLiteral(".ogg"));
     auto pTrack = Track::newTemporary(logicalFilePath);
     pTrack->setTitle(QStringLiteral("Original library metadata"));
 

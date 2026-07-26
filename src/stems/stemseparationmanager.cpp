@@ -421,7 +421,7 @@ void StemSeparationManager::startNext() {
 }
 
 void StemSeparationManager::runJob(const QString& jobId,
-        StemSeparationRequest request,
+        const StemSeparationRequest& request,
         std::shared_ptr<Cancellation> pCancellation) {
     const StemSeparationProcessor::Callbacks callbacks{
             [this, jobId](StemSeparationState state) {
