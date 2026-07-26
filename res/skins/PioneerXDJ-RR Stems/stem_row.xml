@@ -1,0 +1,32 @@
+<Template>
+  <WidgetGroup>
+    <ObjectName>StemRow</ObjectName><Layout>horizontal</Layout><Size>0me,44max</Size>
+    <Children>
+      <Label><ObjectName>StemName</ObjectName><Text><Variable name="label"/></Text><Size>68max,40max</Size></Label>
+      <PushButton>
+        <ObjectName>StemMuteButton</ObjectName><Size>72max,36max</Size><NumberStates>2</NumberStates>
+        <State><Number>0</Number><Text>ON</Text></State><State><Number>1</Number><Text>MUTED</Text></State>
+        <Connection><ConfigKey>[Channel<Variable name="channel"/>_Stem<Variable name="stem"/>],mute</ConfigKey></Connection>
+      </PushButton>
+      <KnobComposed>
+        <ObjectName>StemVolumeKnob</ObjectName><TooltipId>StemVolumeKnob</TooltipId><Size>38max,38max</Size>
+        <Knob>skin:icons/stem_knob_indicator.svg</Knob>
+        <BackPath>skin:icons/stem_knob_bg.svg</BackPath>
+        <MinAngle>-135</MinAngle><MaxAngle>135</MaxAngle>
+        <ArcUnipolar>true</ArcUnipolar><ArcRadius>15</ArcRadius>
+        <ArcColor>#c3d541</ArcColor><ArcBgColor>#303030</ArcBgColor>
+        <ArcThickness>2</ArcThickness><ArcBgThickness>2</ArcBgThickness><ArcRoundCaps>true</ArcRoundCaps>
+        <Connection><ConfigKey>[Channel<Variable name="channel"/>_Stem<Variable name="stem"/>],volume</ConfigKey></Connection>
+      </KnobComposed>
+      <NumberPos>
+        <ObjectName>StemVolumeValue</ObjectName><Size>48max,40max</Size><NumberOfDigits>3</NumberOfDigits>
+        <Connection><ConfigKey>[Channel<Variable name="channel"/>_Stem<Variable name="stem"/>],volume</ConfigKey></Connection>
+      </NumberPos>
+      <Label><ObjectName>StemColorLabel</ObjectName><Text>COLOR</Text><Size>45max,40max</Size></Label>
+      <NumberPos>
+        <ObjectName>StemColorValue</ObjectName><Size>0me,40max</Size><NumberOfDigits>8</NumberOfDigits>
+        <Connection><ConfigKey>[Channel<Variable name="channel"/>_Stem<Variable name="stem"/>],color</ConfigKey></Connection>
+      </NumberPos>
+    </Children>
+  </WidgetGroup>
+</Template>

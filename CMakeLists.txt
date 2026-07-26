@@ -3042,6 +3042,7 @@ if(BUILD_TESTING)
       src/test/steminfotest.cpp
       src/test/stemcontrolobjecttest.cpp
       src/test/stemcontainerwritertest.cpp
+      src/test/stemskinvalidationtest.cpp
     )
     if(ONNXRUNTIME)
       list(APPEND src-mixxx-test src/test/stemstatuscontrolprovidertest.cpp)

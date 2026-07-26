@@ -1,0 +1,48 @@
+<Template>
+  <WidgetGroup>
+    <ObjectName>StemsPage</ObjectName>
+    <Layout>vertical</Layout>
+    <Size>0me,0me</Size>
+    <Children>
+      <Label>
+        <ObjectName>StemsPageTitle</ObjectName>
+        <Text>STEMS · HTDEMUCS ONNX · BACKGROUND SEPARATION</Text>
+        <Size>0me,34max</Size>
+      </Label>
+
+      <WidgetGroup>
+        <ObjectName>StemGlobalStatus</ObjectName>
+        <Layout>horizontal</Layout>
+        <Size>0me,28max</Size>
+        <Children>
+          <Label><Text>MODEL</Text><Size>55max,26max</Size></Label>
+          <NumberPos><ObjectName>StemGlobalValue</ObjectName><Size>35max,26max</Size><NumberOfDigits>1</NumberOfDigits><Connection><ConfigKey>[StemSeparation],model_available</ConfigKey></Connection></NumberPos>
+          <Label><Text>DOWNLOAD</Text><Size>80max,26max</Size></Label>
+          <NumberPos><ObjectName>StemGlobalValue</ObjectName><Size>55max,26max</Size><NumberOfDigits>3</NumberOfDigits><Connection><ConfigKey>[StemSeparation],model_download_progress</ConfigKey></Connection></NumberPos>
+          <Label><Text>% · QUEUE</Text><Size>85max,26max</Size></Label>
+          <NumberPos><ObjectName>StemGlobalValue</ObjectName><Size>35max,26max</Size><NumberOfDigits>2</NumberOfDigits><Connection><ConfigKey>[StemSeparation],queue_size</ConfigKey></Connection></NumberPos>
+          <Label><Text>ACTIVE</Text><Size>65max,26max</Size></Label>
+          <NumberPos><ObjectName>StemGlobalValue</ObjectName><Size>35max,26max</Size><NumberOfDigits>1</NumberOfDigits><Connection><ConfigKey>[StemSeparation],active_jobs</ConfigKey></Connection></NumberPos>
+          <Label><Text>WORKER</Text><Size>70max,26max</Size></Label>
+          <NumberPos><ObjectName>StemGlobalValue</ObjectName><Size>35max,26max</Size><NumberOfDigits>1</NumberOfDigits><Connection><ConfigKey>[StemSeparation],worker_state</ConfigKey></Connection></NumberPos>
+        </Children>
+      </WidgetGroup>
+
+      <WidgetGroup>
+        <ObjectName>StemDecks</ObjectName>
+        <Layout>horizontal</Layout>
+        <Size>0me,0me</Size>
+        <Children>
+          <Template src="skin:stem_deck.xml"><SetVariable name="channel">1</SetVariable></Template>
+          <Template src="skin:stem_deck.xml"><SetVariable name="channel">2</SetVariable></Template>
+        </Children>
+      </WidgetGroup>
+
+      <Label>
+        <ObjectName>StemsFooter</ObjectName>
+        <Text>Background only · completed stems become active on the next deck load · no hot swap</Text>
+        <Size>0me,24max</Size>
+      </Label>
+    </Children>
+  </WidgetGroup>
+</Template>

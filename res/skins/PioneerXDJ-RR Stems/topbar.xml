@@ -1,0 +1,90 @@
+<Template>
+  <WidgetGroup>
+    <ObjectName>Topbar</ObjectName>
+    <Layout>vertical</Layout>
+    <Size>0me,54max</Size>
+    <Children>
+
+      <!-- Línea de estado superior muy fina -->
+      <WidgetGroup>
+        <ObjectName>TopStatusBar</ObjectName>
+        <Layout>horizontal</Layout>
+        <Size>0me,12max</Size>
+        <Children>
+          <Label><ObjectName>TopUtilityLabel</ObjectName><Text>— UTILITY</Text><Size>0me,12max</Size></Label>
+        </Children>
+      </WidgetGroup>
+
+      <!-- TABS centrados con margen arriba 4px y abajo 4px -->
+      <WidgetGroup>
+        <ObjectName>TabControls</ObjectName>
+        <Layout>horizontal</Layout>
+        <Size>0me,42max</Size>
+        <Children>
+
+          <!-- Flex spacer izquierdo — empuja tabs al centro -->
+          <Label><Size>0me,42max</Size></Label>
+
+          <!-- MIXING -->
+          <PushButton>
+            <ObjectName>TabButtonOverview</ObjectName>
+            <Size>132max,32max</Size>
+            <NumberStates>2</NumberStates>
+            <State><Number>0</Number><Text>MIXING</Text></State>
+            <State><Number>1</Number><Text>MIXING</Text></State>
+            <Connection>
+              <ConfigKey>[Tab],overview</ConfigKey>
+            </Connection>
+          </PushButton>
+
+          <Label><Size>12max,42max</Size></Label>
+
+          <!-- BROWSE -->
+          <PushButton>
+            <ObjectName>TabButtonBrowse</ObjectName>
+            <Size>132max,32max</Size>
+            <NumberStates>2</NumberStates>
+            <State><Number>0</Number><Text>BROWSE</Text></State>
+            <State><Number>1</Number><Text>BROWSE</Text></State>
+            <Connection>
+              <ConfigKey>[Tab],library</ConfigKey>
+            </Connection>
+          </PushButton>
+
+          <Label><Size>12max,42max</Size></Label>
+
+          <!-- SAMPLERS -->
+          <PushButton>
+            <ObjectName>TabButtonSamplers</ObjectName>
+            <Size>132max,32max</Size>
+            <NumberStates>2</NumberStates>
+            <State><Number>0</Number><Text>SAMPLERS</Text></State>
+            <State><Number>1</Number><Text>SAMPLERS</Text></State>
+            <Connection>
+              <ConfigKey>[Tab],samplers</ConfigKey>
+            </Connection>
+          </PushButton>
+
+          <Label><Size>12max,42max</Size></Label>
+
+          <!-- STEMS -->
+          <PushButton>
+            <ObjectName>TabButtonStems</ObjectName>
+            <Size>132max,32max</Size>
+            <NumberStates>2</NumberStates>
+            <State><Number>0</Number><Text>STEMS</Text></State>
+            <State><Number>1</Number><Text>STEMS</Text></State>
+            <Connection>
+              <ConfigKey>[Tab],stems</ConfigKey>
+            </Connection>
+          </PushButton>
+
+          <!-- Flex spacer derecho — equilibra el centrado -->
+          <Label><Size>0me,42max</Size></Label>
+
+        </Children>
+      </WidgetGroup>
+
+    </Children>
+  </WidgetGroup>
+</Template>

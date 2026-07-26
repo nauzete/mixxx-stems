@@ -1,0 +1,98 @@
+<Template>
+  <WidgetGroup>
+    <ObjectName>StemDeck</ObjectName>
+    <Layout>vertical</Layout>
+    <Size>0me,0me</Size>
+    <Children>
+      <Label>
+        <ObjectName>StemDeckTitle</ObjectName>
+        <Text>DECK <Variable name="channel"/> · STEMS</Text>
+        <Size>0me,34max</Size>
+      </Label>
+
+      <WidgetGroup>
+        <ObjectName>StemStatusRow</ObjectName>
+        <Layout>horizontal</Layout>
+        <Size>0me,38max</Size>
+        <Children>
+          <PushButton>
+            <ObjectName>StemGenerateButton</ObjectName><Size>78max,34max</Size><NumberStates>1</NumberStates>
+            <State><Number>0</Number><Text>GENERATE</Text></State>
+            <Connection><ConfigKey>[Channel<Variable name="channel"/>],separation_trigger</ConfigKey></Connection>
+          </PushButton>
+          <PushButton>
+            <ObjectName>StemCancelButton</ObjectName><Size>65max,34max</Size><NumberStates>1</NumberStates>
+            <State><Number>0</Number><Text>CANCEL</Text></State>
+            <Connection><ConfigKey>[Channel<Variable name="channel"/>],separation_cancel</ConfigKey></Connection>
+          </PushButton>
+          <PushButton>
+            <ObjectName>StemState</ObjectName><Size>110max,34max</Size><NumberStates>11</NumberStates>
+            <State><Number>0</Number><Text>IDLE</Text></State>
+            <State><Number>1</Number><Text>QUEUED</Text></State>
+            <State><Number>2</Number><Text>PREPARING</Text></State>
+            <State><Number>3</Number><Text>SEPARATING</Text></State>
+            <State><Number>4</Number><Text>ENCODING</Text></State>
+            <State><Number>5</Number><Text>VALIDATING</Text></State>
+            <State><Number>6</Number><Text>READY</Text></State>
+            <State><Number>7</Number><Text>CANCELLED</Text></State>
+            <State><Number>8</Number><Text>FAILED</Text></State>
+            <State><Number>9</Number><Text>UNAVAILABLE</Text></State>
+            <State><Number>10</Number><Text>PAUSED</Text></State>
+            <Connection><ConfigKey>[Channel<Variable name="channel"/>],separation_state</ConfigKey></Connection>
+          </PushButton>
+          <NumberPos>
+            <ObjectName>StemProgress</ObjectName><Size>48max,34max</Size><NumberOfDigits>3</NumberOfDigits>
+            <Connection><ConfigKey>[Channel<Variable name="channel"/>],separation_percentage</ConfigKey></Connection>
+          </NumberPos>
+          <Label><ObjectName>StemPercentLabel</ObjectName><Text>%</Text><Size>14max,34max</Size></Label>
+        </Children>
+      </WidgetGroup>
+
+      <WidgetGroup>
+        <ObjectName>StemButtons</ObjectName>
+        <Layout>vertical</Layout>
+        <Size>0me,0me</Size>
+        <Children>
+          <Template src="skin:stem_row.xml"><SetVariable name="channel"><Variable name="channel"/></SetVariable><SetVariable name="stem">1</SetVariable><SetVariable name="label">DRUMS</SetVariable></Template>
+          <Template src="skin:stem_row.xml"><SetVariable name="channel"><Variable name="channel"/></SetVariable><SetVariable name="stem">2</SetVariable><SetVariable name="label">BASS</SetVariable></Template>
+          <Template src="skin:stem_row.xml"><SetVariable name="channel"><Variable name="channel"/></SetVariable><SetVariable name="stem">3</SetVariable><SetVariable name="label">OTHER</SetVariable></Template>
+          <Template src="skin:stem_row.xml"><SetVariable name="channel"><Variable name="channel"/></SetVariable><SetVariable name="stem">4</SetVariable><SetVariable name="label">VOCALS</SetVariable></Template>
+        </Children>
+        <Connection>
+          <ConfigKey>[Channel<Variable name="channel"/>],stem_count</ConfigKey>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+      </WidgetGroup>
+
+      <WidgetGroup>
+        <ObjectName>StemEmpty</ObjectName>
+        <Layout>vertical</Layout>
+        <Size>0me,0me</Size>
+        <Children>
+          <Label><ObjectName>StemEmptyTitle</ObjectName><Text>NO COMPLETED STEMS</Text><Size>0me,55max</Size></Label>
+          <Label><ObjectName>StemEmptyHint</ObjectName><Text>Generate stems above. Processing stays in the background.</Text><Size>0me,35max</Size></Label>
+        </Children>
+        <Connection>
+          <ConfigKey>[Channel<Variable name="channel"/>],stem_count</ConfigKey>
+          <Transform><Not/></Transform>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+      </WidgetGroup>
+
+      <WidgetGroup>
+        <ObjectName>StemCacheRow</ObjectName>
+        <Layout>horizontal</Layout><Size>0me,34max</Size>
+        <Children>
+          <Label><ObjectName>StemCacheLabel</ObjectName><Text>CACHE</Text><Size>50max,34max</Size></Label>
+          <NumberPos><ObjectName>StemCacheStatus</ObjectName><Size>32max,34max</Size><NumberOfDigits>1</NumberOfDigits><Connection><ConfigKey>[Channel<Variable name="channel"/>],stem_cache_status</ConfigKey></Connection></NumberPos>
+          <Label><ObjectName>StemCacheLabel</ObjectName><Text>QUEUE</Text><Size>55max,34max</Size></Label>
+          <NumberPos><ObjectName>StemQueuePosition</ObjectName><Size>35max,34max</Size><NumberOfDigits>2</NumberOfDigits><Connection><ConfigKey>[Channel<Variable name="channel"/>],separation_queue_position</ConfigKey></Connection></NumberPos>
+          <Label><ObjectName>StemCacheLabel</ObjectName><Text>ERROR</Text><Size>55max,34max</Size></Label>
+          <NumberPos><ObjectName>StemError</ObjectName><Size>32max,34max</Size><NumberOfDigits>1</NumberOfDigits><Connection><ConfigKey>[Channel<Variable name="channel"/>],separation_error</ConfigKey></Connection></NumberPos>
+          <Label><ObjectName>StemCountLabel</ObjectName><Text>STEMS</Text><Size>50max,34max</Size></Label>
+          <NumberPos><ObjectName>StemCount</ObjectName><Size>28max,34max</Size><NumberOfDigits>1</NumberOfDigits><Connection><ConfigKey>[Channel<Variable name="channel"/>],stem_count</ConfigKey></Connection></NumberPos>
+        </Children>
+      </WidgetGroup>
+    </Children>
+  </WidgetGroup>
+</Template>
