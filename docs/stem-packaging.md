@@ -9,7 +9,9 @@ distributions:
 
 Every package is uploaded with a SHA-256 sidecar. A `stems-v*` tag publishes
 the already validated files as a GitHub release. A manual dispatch builds the
-same files without publishing a release.
+same files without publishing a release. Pull requests targeting
+`stems-integration` also build and validate both distributions, while the
+release job remains disabled.
 
 ## Independent Windows installation
 

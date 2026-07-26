@@ -4,6 +4,9 @@ name: Mixxx Stems packages
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches:
+      - stems-integration
   push:
     tags:
       - "stems-v*"
