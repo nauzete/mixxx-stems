@@ -2777,6 +2777,8 @@ target_sources(
     src/stems/stemchunkpipeline.cpp
     src/stems/stemchunkpipeline.h
     src/stems/steminferencerunner.h
+    src/stems/stemmodelmanager.cpp
+    src/stems/stemmodelmanager.h
     src/stems/stemseparationmanager.cpp
     src/stems/stemseparationmanager.h
 )
@@ -3007,6 +3009,7 @@ if(BUILD_TESTING)
     src/test/stemcachetest.cpp
     src/test/stemalternatesourcelinkertest.cpp
     src/test/stemchunkpipelinetest.cpp
+    src/test/stemmodelmanagertest.cpp
     src/test/stemseparationmanagertest.cpp
     src/test/soundproxy_test.cpp
     src/test/soundsourceproviderregistrytest.cpp
