@@ -2768,6 +2768,8 @@ endif()
 target_sources(
   mixxx-lib
   PRIVATE
+    src/stems/stemaudiosourcereader.cpp
+    src/stems/stemaudiosourcereader.h
     src/stems/stemchunkpipeline.cpp
     src/stems/stemchunkpipeline.h
     src/stems/steminferencerunner.h
