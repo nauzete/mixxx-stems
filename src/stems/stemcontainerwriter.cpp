@@ -541,9 +541,33 @@ class StemContainerWriter::Impl {
         }
         pStream->pCodec->codec_id = AV_CODEC_ID_AAC;
         pStream->pCodec->codec_type = AVMEDIA_TYPE_AUDIO;
+#if LIBAVCODEC_VERSION_MAJOR >= 61
+        const void* supportedSampleFormats = nullptr;
+        const auto supportedConfigResult =
+                avcodec_get_supported_config(pStream->pCodec,
+                        pEncoder,
+                        AV_CODEC_CONFIG_SAMPLE_FORMAT,
+                        0,
+                        &supportedSampleFormats,
+                        nullptr);
+        if (supportedConfigResult < 0) {
+            return fail(pErrorMessage,
+                    QStringLiteral(
+                            "Failed to query AAC sample formats: %1")
+                            .arg(ffmpegError(
+                                    supportedConfigResult)));
+        }
+        const auto* const sampleFormats =
+                static_cast<const AVSampleFormat*>(
+                        supportedSampleFormats);
+        pStream->pCodec->sample_fmt = sampleFormats
+                ? sampleFormats[0]
+                : AV_SAMPLE_FMT_FLTP;
+#else
         pStream->pCodec->sample_fmt = pEncoder->sample_fmts
                 ? pEncoder->sample_fmts[0]
                 : AV_SAMPLE_FMT_FLTP;
+#endif
         pStream->pCodec->sample_rate = kSampleRate;
         pStream->pCodec->bit_rate = settings.bitRatePerStream;
         pStream->pCodec->time_base = {1, kSampleRate};
@@ -743,6 +767,12 @@ class StemContainerWriter::Impl {
     bool opened = false;
     bool committed = false;
 };
+
+StemContainerWriter::StemContainerWriter(
+        QString outputFilePath)
+        : StemContainerWriter(
+                  std::move(outputFilePath), Settings{}) {
+}
 
 StemContainerWriter::StemContainerWriter(
         QString outputFilePath, Settings settings)

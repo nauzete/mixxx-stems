@@ -2,7 +2,7 @@
 
 #include <QByteArray>
 #include <QString>
-#include <QtTypes>
+#include <QtGlobal>
 #include <cstddef>
 #include <memory>
 #include <span>
@@ -28,9 +28,8 @@ class StemContainerWriter final {
         qint64 maximumOutputBytes = kDefaultMaximumOutputBytes;
     };
 
-    explicit StemContainerWriter(
-            QString outputFilePath,
-            Settings settings = {});
+    explicit StemContainerWriter(QString outputFilePath);
+    StemContainerWriter(QString outputFilePath, Settings settings);
     ~StemContainerWriter();
 
     StemContainerWriter(const StemContainerWriter&) = delete;
