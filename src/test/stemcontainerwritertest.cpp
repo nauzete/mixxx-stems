@@ -1,16 +1,14 @@
-#include "stems/stemcontainerwriter.h"
-
 #include <gtest/gtest.h>
 
+#include <QFileInfo>
+#include <QTemporaryDir>
 #include <algorithm>
 #include <cmath>
 #include <numbers>
 #include <vector>
 
-#include <QFileInfo>
-#include <QTemporaryDir>
-
 #include "sources/soundsourcestem.h"
+#include "stems/stemcontainerwriter.h"
 #include "track/steminfoimporter.h"
 
 namespace mixxx::stems {
@@ -49,8 +47,7 @@ TEST(StemContainerWriterTest, WritesValidIncrementalStemMp4) {
             for (std::size_t frame = 0; frame < frameCount; ++frame) {
                 stems[(stem * StemContainerWriter::kChannelCount + channel) *
                                 frameCount +
-                        frame] = static_cast<float>(
-                        0.02 * (stem + 1) *
+                        frame] = static_cast<float>(0.02 * (stem + 1) *
                         std::sin(2.0 * std::numbers::pi *
                                 (110.0 + 20.0 * channel) *
                                 static_cast<double>(frame) /

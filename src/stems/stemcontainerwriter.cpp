@@ -11,18 +11,17 @@ extern "C" {
 #include <libswresample/swresample.h>
 }
 
-#include <algorithm>
-#include <array>
-#include <limits>
-#include <utility>
-#include <vector>
-
 #include <QFile>
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QtEndian>
+#include <algorithm>
+#include <array>
+#include <limits>
+#include <utility>
+#include <vector>
 
 #include "track/steminfoimporter.h"
 #include "util/logger.h"
@@ -690,7 +689,7 @@ class StemContainerWriter::Impl {
                     QStringLiteral("Failed to allocate AAC packet"));
         }
         while ((result =
-                        avcodec_receive_packet(pStream->pCodec, pPacket)) >=
+                               avcodec_receive_packet(pStream->pCodec, pPacket)) >=
                 0) {
             av_packet_rescale_ts(pPacket,
                     pStream->pCodec->time_base,

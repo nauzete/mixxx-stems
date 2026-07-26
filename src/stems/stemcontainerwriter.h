@@ -1,12 +1,11 @@
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <span>
-
 #include <QByteArray>
 #include <QString>
 #include <QtTypes>
+#include <cstddef>
+#include <memory>
+#include <span>
 
 namespace mixxx::stems {
 

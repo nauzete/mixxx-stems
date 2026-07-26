@@ -111,7 +111,7 @@ StemChunkPipeline::Result StemChunkPipeline::run(
         const auto emitFrameCount =
                 finalSegment ? totalFrameCount - emittedFrameCount
                              : kStrideSampleCount;
-        emit(emittedFrameCount, emitFrameCount, write);
+        emitChunk(emittedFrameCount, emitFrameCount, write);
         emittedFrameCount += emitFrameCount;
         if (!finalSegment) {
             shiftAccumulator();
@@ -234,7 +234,7 @@ void StemChunkPipeline::addSegment(
     }
 }
 
-void StemChunkPipeline::emit(
+void StemChunkPipeline::emitChunk(
         std::size_t frameOffset,
         std::size_t frameCount,
         const WriteCallback& write) {
