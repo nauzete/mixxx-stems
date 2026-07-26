@@ -2775,6 +2775,8 @@ target_sources(
     src/stems/stemchunkpipeline.cpp
     src/stems/stemchunkpipeline.h
     src/stems/steminferencerunner.h
+    src/stems/stemseparationmanager.cpp
+    src/stems/stemseparationmanager.h
 )
 find_package(onnxruntime CONFIG QUIET)
 if(NOT onnxruntime_FOUND)
@@ -2994,6 +2996,7 @@ if(BUILD_TESTING)
     src/test/softtakeover_test.cpp
     src/test/stemcachetest.cpp
     src/test/stemchunkpipelinetest.cpp
+    src/test/stemseparationmanagertest.cpp
     src/test/soundproxy_test.cpp
     src/test/soundsourceproviderregistrytest.cpp
     src/test/sqliteliketest.cpp
