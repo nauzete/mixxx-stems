@@ -615,8 +615,8 @@ void BaseTrackPlayerImpl::disconnectLoadedTrack() {
 
 #ifdef __STEM__
 void BaseTrackPlayerImpl::setAlternateAudioSourceResolver(
-        AlternateAudioSourceResolver resolver) {
-    m_alternateAudioSourceResolver = std::move(resolver);
+        const AlternateAudioSourceResolver& resolver) {
+    m_alternateAudioSourceResolver = resolver;
 }
 
 void BaseTrackPlayerImpl::slotLoadTrack(TrackPointer pNewTrack,

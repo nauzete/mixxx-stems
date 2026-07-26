@@ -30,8 +30,8 @@ class FakeDeck final : public BaseTrackPlayer {
     }
 
     void setAlternateAudioSourceResolver(
-            AlternateAudioSourceResolver resolver) final {
-        m_resolver = std::move(resolver);
+            const AlternateAudioSourceResolver& resolver) final {
+        m_resolver = resolver;
     }
 
     void slotLoadTrack(TrackPointer pTrack,

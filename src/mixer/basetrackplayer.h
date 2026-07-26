@@ -58,7 +58,7 @@ class BaseTrackPlayer : public BasePlayer {
             std::function<QUrl(const TrackPointer&)>;
 
     virtual void setAlternateAudioSourceResolver(
-            AlternateAudioSourceResolver resolver) {
+            const AlternateAudioSourceResolver& resolver) {
         Q_UNUSED(resolver);
     }
 #endif
@@ -122,7 +122,7 @@ class BaseTrackPlayerImpl : public BaseTrackPlayer {
     TrackPointer loadFakeTrack(bool bPlay, double filebpm);
 #ifdef __STEM__
     void setAlternateAudioSourceResolver(
-            AlternateAudioSourceResolver resolver) final;
+            const AlternateAudioSourceResolver& resolver) final;
 #endif
 
   public slots:

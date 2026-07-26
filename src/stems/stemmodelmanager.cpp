@@ -19,6 +19,8 @@
 #include <functional>
 #include <utility>
 
+#include "moc_stemmodelmanager.cpp"
+
 namespace mixxx::stems {
 namespace {
 

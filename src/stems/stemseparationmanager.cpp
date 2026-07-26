@@ -15,6 +15,7 @@
 #include <exception>
 #include <utility>
 
+#include "moc_stemseparationmanager.cpp"
 #include "util/logger.h"
 
 namespace mixxx::stems {

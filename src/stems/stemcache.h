@@ -4,7 +4,7 @@
 #include <QHash>
 #include <QSet>
 #include <QString>
-#include <QtTypes>
+#include <QtGlobal>
 #include <functional>
 #include <optional>
 

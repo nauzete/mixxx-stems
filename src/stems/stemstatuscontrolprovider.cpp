@@ -12,6 +12,7 @@
 #include "control/controlobject.h"
 #include "control/controlpushbutton.h"
 #include "mixer/basetrackplayer.h"
+#include "moc_stemstatuscontrolprovider.cpp"
 #include "stems/demucsstemseparationprocessor.h"
 #include "stems/stemalternatesourcelinker.h"
 #include "stems/stemmodelmanager.h"

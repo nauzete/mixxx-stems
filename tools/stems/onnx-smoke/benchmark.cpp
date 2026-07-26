@@ -15,8 +15,11 @@
 #include <vector>
 
 #if defined(_WIN32)
-#include <psapi.h>
+// windows.h must precede psapi.h.
+// clang-format off
 #include <windows.h>
+#include <psapi.h>
+// clang-format on
 #elif defined(__linux__)
 #include <sys/resource.h>
 #endif

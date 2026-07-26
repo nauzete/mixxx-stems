@@ -72,12 +72,17 @@ jobs:
         shell: cmd
         run: tools\windows_buildenv.bat setup
 
+      - name: Bootstrap pinned vcpkg
+        run: .\bootstrap-vcpkg.bat
+        working-directory: _deps/vcpkg-stems
+
       - name: Build ONNX Runtime CPU in the Mixxx environment
         shell: pwsh
         run: |
-          & "$env:MIXXX_VCPKG_ROOT\vcpkg.exe" install `
+          & "${{ github.workspace }}\_deps\vcpkg-stems\vcpkg.exe" install `
             onnxruntime:x64-windows-release `
             "--overlay-ports=${{ github.workspace }}\_deps\vcpkg-stems\ports" `
+            "--x-install-root=$env:MIXXX_VCPKG_ROOT\installed" `
             --clean-after-build `
             --x-abi-tools-use-exact-versions
           if ($LASTEXITCODE -ne 0) {
