@@ -186,8 +186,49 @@ Downloaded Ubuntu ARM64 DEB SHA-256:
 
 ### Next task
 
-1. Validate Phase 4 on Windows x64 and Ubuntu 24.04 ARM64.
-2. Begin Phase 5 container writing after the focused chunk-pipeline checks
-   pass.
-3. Keep inference, decoding, encoding, and file operations off the real-time
-   audio thread.
+1. Publish the combined Phase 6-12 branch and open its draft integration PR.
+2. Run the complete packaging workflow once for Windows x64 and native Ubuntu
+   24.04 ARM64.
+3. Record package, benchmark, and remaining physical-hardware results.
+
+## Session 2026-07-26
+
+### Integrated phases
+
+- Phase 4 was merged by PR
+  `https://github.com/nauzete/mixxx-stems/pull/5` at integration commit
+  `1c3b785512f06204a5d825500e3668aa16aed524`.
+- Phase 5 was merged by PR
+  `https://github.com/nauzete/mixxx-stems/pull/6` at integration commit
+  `8db199a4f4938b3ad1403a57acbd1043611ef3f7`.
+- The Phase 5 ONNX workflow passed real-model CPU inference on Windows x64
+  and native Ubuntu 24.04 ARM64:
+  `https://github.com/nauzete/mixxx-stems/actions/runs/30193124526`.
+- The complete Phase 5 Mixxx matrix passed on its second attempt:
+  `https://github.com/nauzete/mixxx-stems/actions/runs/30193124594`.
+- The first macOS x64 attempt failed in the unrelated
+  `BeatsTranslateTest.SimpleTranslateMatch`; rerunning only that job passed.
+
+### Implemented locally
+
+- Phase 6: persistent quota-bound stem cache, crash recovery, and a
+  single-worker priority separation queue.
+- Phase 7: persistent alternate-source links that become active only on the
+  next deck load.
+- Phase 8: pinned model management and background separation ControlObjects.
+- Phase 9: GPLv3 derivative `PioneerXDJ-RR Stems` touch skin.
+- Phase 10: DDJ-FLX4 stems mapping variant with long-press generation and
+  state LEDs.
+- Phase 11: branded MSI, portable ZIP, and native ARM64 DEB packaging
+  workflow.
+- Phase 12: real-model benchmark tooling and Raspberry Pi 5 hardware audit
+  scripts.
+- Phases 6-12 were rebased without conflicts onto integration commit
+  `8db199a4f4938b3ad1403a57acbd1043611ef3f7`.
+- All repository pre-commit hooks pass for the combined Phase 6-12 range.
+
+### Remaining external validation
+
+- `BLOCKED_EXTERNAL_HARDWARE`: Raspberry Pi 5 performance, thermals,
+  throttling, underruns, two-hour soak, DDJ-FLX4 controls, touch display, and
+  master/headphone audio require the physical devices.
