@@ -4,6 +4,7 @@
 
 #include <QAtomicInt>
 #include <QMutex>
+#include <QUrl>
 #include <initializer_list>
 
 #include "audio/frame.h"
@@ -224,7 +225,8 @@ class EngineBuffer : public EngineObject {
     void loadTrack(TrackPointer pTrack,
             mixxx::StemChannelSelection stemMask,
             bool play,
-            EngineChannel* pChannelToCloneFrom);
+            EngineChannel* pChannelToCloneFrom,
+            QUrl alternateAudioUrl = {});
 
     mixxx::StemChannelSelection getStemMask() const {
         return m_stemMask;

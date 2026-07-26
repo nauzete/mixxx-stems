@@ -64,6 +64,12 @@ class SoundSourceProxy {
 
     explicit SoundSourceProxy(TrackPointer pTrack);
 
+#ifdef __STEM__
+    /// Opens audio from an alternate representation while retaining pTrack as
+    /// the logical metadata owner.
+    SoundSourceProxy(TrackPointer pTrack, const QUrl& audioUrl);
+#endif
+
     // Only needed for testing all available providers explicitly
     SoundSourceProxy(
             TrackPointer pTrack,

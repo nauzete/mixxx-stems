@@ -1582,7 +1582,8 @@ void EngineBuffer::hintReader(const double dRate) {
 void EngineBuffer::loadTrack(TrackPointer pTrack,
         mixxx::StemChannelSelection stemMask,
         bool play,
-        EngineChannel* pChannelToCloneFrom) {
+        EngineChannel* pChannelToCloneFrom,
+        QUrl alternateAudioUrl) {
 #else
 void EngineBuffer::loadTrack(TrackPointer pTrack,
         bool play,
@@ -1593,7 +1594,9 @@ void EngineBuffer::loadTrack(TrackPointer pTrack,
         // trackLoading and then either with trackLoaded or trackLoadFailed signals.
         m_bPlayAfterLoading = play;
 #ifdef __STEM__
-        m_pReader->newTrack(pTrack, stemMask);
+        m_pReader->newTrack(pTrack,
+                stemMask,
+                std::move(alternateAudioUrl));
         m_stemMask = stemMask;
 #else
         m_pReader->newTrack(pTrack);

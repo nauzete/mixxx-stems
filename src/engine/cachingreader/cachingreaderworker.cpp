@@ -95,7 +95,9 @@ ReaderStatusUpdate CachingReaderWorker::processReadRequest(
 
 // WARNING: Always called from a different thread (GUI)
 #ifdef __STEM__
-void CachingReaderWorker::newTrack(TrackPointer pTrack, mixxx::StemChannelSelection stemMask) {
+void CachingReaderWorker::newTrack(TrackPointer pTrack,
+        mixxx::StemChannelSelection stemMask,
+        QUrl alternateAudioUrl) {
 #else
 void CachingReaderWorker::newTrack(TrackPointer pTrack) {
 #endif
@@ -104,7 +106,8 @@ void CachingReaderWorker::newTrack(TrackPointer pTrack) {
 #ifdef __STEM__
         m_pNewTrack = NewTrackRequest{
                 pTrack,
-                stemMask};
+                stemMask,
+                std::move(alternateAudioUrl)};
 #else
         m_pNewTrack = pTrack;
 #endif
@@ -138,7 +141,9 @@ void CachingReaderWorker::run() {
 #ifdef __STEM__
             if (pLoadTrack.track) {
                 // in this case the engine is still running with the old track
-                loadTrack(pLoadTrack.track, pLoadTrack.stemMask);
+                loadTrack(pLoadTrack.track,
+                        pLoadTrack.stemMask,
+                        pLoadTrack.alternateAudioUrl);
 #else
             if (pLoadTrack) {
                 // in this case the engine is still running with the old track
@@ -191,7 +196,9 @@ void CachingReaderWorker::unloadTrack() {
 
 #ifdef __STEM__
 void CachingReaderWorker::loadTrack(
-        const TrackPointer& pTrack, mixxx::StemChannelSelection stemMask) {
+        const TrackPointer& pTrack,
+        mixxx::StemChannelSelection stemMask,
+        const QUrl& alternateAudioUrl) {
 #else
 void CachingReaderWorker::loadTrack(const TrackPointer& pTrack) {
 #endif
@@ -219,12 +226,17 @@ void CachingReaderWorker::loadTrack(const TrackPointer& pTrack) {
 #ifdef __STEM__
     config.setStemMask(stemMask);
 #endif
-    m_pAudioSource = SoundSourceProxy(pTrack).openAudioSource(config);
+    m_pAudioSource = alternateAudioUrl.isEmpty()
+            ? SoundSourceProxy(pTrack).openAudioSource(config)
+            : SoundSourceProxy(pTrack, alternateAudioUrl)
+                      .openAudioSource(config);
     if (!m_pAudioSource) {
         kLogger.warning()
                 << m_group
                 << "Failed to open file"
-                << pTrack->getFileInfo();
+                << (alternateAudioUrl.isEmpty()
+                                   ? pTrack->getFileInfo().toQUrl()
+                                   : alternateAudioUrl);
         const auto update = ReaderStatusUpdate::trackUnloaded();
         m_pReaderStatusFIFO->writeBlocking(&update, 1);
         emit trackLoadFailed(pTrack,

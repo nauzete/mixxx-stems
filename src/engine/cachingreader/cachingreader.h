@@ -3,6 +3,7 @@
 #include <QAtomicInt>
 #include <QHash>
 #include <QList>
+#include <QUrl>
 #include <QVarLengthArray>
 #include <QVector>
 #include <list>
@@ -117,7 +118,9 @@ class CachingReader : public QObject {
     // processed in the work thread, so the reader must be woken up via wake()
     // for this to take effect.
 #ifdef __STEM__
-    void newTrack(TrackPointer pTrack, mixxx::StemChannelSelection stemMask = {});
+    void newTrack(TrackPointer pTrack,
+            mixxx::StemChannelSelection stemMask = {},
+            QUrl alternateAudioUrl = {});
 #else
     void newTrack(TrackPointer pTrack);
 #endif

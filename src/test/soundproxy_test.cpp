@@ -202,6 +202,30 @@ TEST_F(SoundSourceProxyTest, open) {
     }
 }
 
+#ifdef __STEM__
+TEST_F(SoundSourceProxyTest,
+        alternateAudioSourceRetainsLogicalTrack) {
+    const auto logicalFilePath = getTestFile(".flac");
+    const auto alternateFilePath = getTestFile(".stem.mp4");
+    auto pTrack = Track::newTemporary(logicalFilePath);
+    pTrack->setTitle(QStringLiteral("Original library metadata"));
+
+    SoundSourceProxy proxy(
+            pTrack, QUrl::fromLocalFile(alternateFilePath));
+    EXPECT_EQ(proxy.getTrack(), pTrack);
+    EXPECT_EQ(proxy.getUrl(),
+            QUrl::fromLocalFile(alternateFilePath));
+
+    auto pAudioSource = proxy.openAudioSource();
+
+    ASSERT_TRUE(pAudioSource);
+    EXPECT_EQ(pTrack->getLocation(), logicalFilePath);
+    EXPECT_EQ(pTrack->getTitle(),
+            QStringLiteral("Original library metadata"));
+    pAudioSource->close();
+}
+#endif
+
 TEST_F(SoundSourceProxyTest, openEmptyFile) {
     const QStringList fileNameSuffixes = getFileNameSuffixes();
 

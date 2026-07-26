@@ -2768,6 +2768,8 @@ endif()
 target_sources(
   mixxx-lib
   PRIVATE
+    src/stems/stemalternatesourcelinker.cpp
+    src/stems/stemalternatesourcelinker.h
     src/stems/stemaudiosourcereader.cpp
     src/stems/stemaudiosourcereader.h
     src/stems/stemcache.cpp
@@ -3003,6 +3005,7 @@ if(BUILD_TESTING)
     src/test/skincontext_test.cpp
     src/test/softtakeover_test.cpp
     src/test/stemcachetest.cpp
+    src/test/stemalternatesourcelinkertest.cpp
     src/test/stemchunkpipelinetest.cpp
     src/test/stemseparationmanagertest.cpp
     src/test/soundproxy_test.cpp

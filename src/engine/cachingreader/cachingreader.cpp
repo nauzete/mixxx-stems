@@ -206,7 +206,9 @@ CachingReaderChunkForOwner* CachingReader::lookupChunkAndFreshen(SINT chunkIndex
 
 // Invoked from the UI thread!!
 #ifdef __STEM__
-void CachingReader::newTrack(TrackPointer pTrack, mixxx::StemChannelSelection stemMask) {
+void CachingReader::newTrack(TrackPointer pTrack,
+        mixxx::StemChannelSelection stemMask,
+        QUrl alternateAudioUrl) {
 #else
 void CachingReader::newTrack(TrackPointer pTrack) {
 #endif
@@ -225,7 +227,9 @@ void CachingReader::newTrack(TrackPointer pTrack) {
                 << "Loading a new track while loading a track may lead to inconsistent states";
     }
 #ifdef __STEM__
-    m_worker.newTrack(std::move(pTrack), stemMask);
+    m_worker.newTrack(std::move(pTrack),
+            stemMask,
+            std::move(alternateAudioUrl));
 #else
     m_worker.newTrack(std::move(pTrack));
 #endif

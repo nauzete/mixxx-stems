@@ -2,6 +2,8 @@
 
 #include <qtmetamacros.h>
 
+#include <QUrl>
+#include <functional>
 #include <gsl/pointers>
 #include <memory>
 
@@ -50,6 +52,16 @@ class BaseTrackPlayer : public BasePlayer {
     virtual bool isTrackMenuControlAvailable() {
         return false;
     };
+
+#ifdef __STEM__
+    using AlternateAudioSourceResolver =
+            std::function<QUrl(const TrackPointer&)>;
+
+    virtual void setAlternateAudioSourceResolver(
+            AlternateAudioSourceResolver resolver) {
+        Q_UNUSED(resolver);
+    }
+#endif
 
   public slots:
 #ifdef __STEM__
@@ -108,6 +120,10 @@ class BaseTrackPlayerImpl : public BaseTrackPlayer {
     bool isTrackMenuControlAvailable() final;
     /// For testing, loads a fake track.
     TrackPointer loadFakeTrack(bool bPlay, double filebpm);
+#ifdef __STEM__
+    void setAlternateAudioSourceResolver(
+            AlternateAudioSourceResolver resolver) final;
+#endif
 
   public slots:
 #ifdef __STEM__
@@ -165,6 +181,9 @@ class BaseTrackPlayerImpl : public BaseTrackPlayer {
     void disconnectLoadedTrack();
 
     UserSettingsPointer m_pConfig;
+#ifdef __STEM__
+    AlternateAudioSourceResolver m_alternateAudioSourceResolver;
+#endif
     EngineMixer* m_pEngineMixer;
     TrackPointer m_pLoadedTrack;
     TrackId m_pPrevFailedTrackId;

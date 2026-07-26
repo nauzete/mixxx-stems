@@ -1,12 +1,12 @@
 #pragma once
 
-#include <functional>
-#include <memory>
-
 #include <QByteArray>
 #include <QSet>
 #include <QString>
+#include <functional>
+#include <memory>
 
+#include "stems/stemalternatesourcelinker.h"
 #include "stems/stemcache.h"
 #include "stems/stemseparationmanager.h"
 
@@ -51,6 +51,7 @@ class DemucsStemSeparationProcessor final
     Settings m_settings;
     ProtectedEntryIdsProvider m_protectedEntryIdsProvider;
     StemCache m_cache;
+    StemAlternateSourceLinker m_alternateSourceLinker;
     std::unique_ptr<DemucsOnnxRunner> m_pRunner;
     bool m_cacheInitialized = false;
     bool m_modelVerified = false;

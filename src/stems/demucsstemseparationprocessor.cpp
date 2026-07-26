@@ -1,13 +1,12 @@
 #include "stems/demucsstemseparationprocessor.h"
 
-#include <filesystem>
-#include <stdexcept>
-#include <utility>
-
 #include <QByteArrayView>
 #include <QCryptographicHash>
 #include <QFile>
 #include <QFileInfo>
+#include <filesystem>
+#include <stdexcept>
+#include <utility>
 
 #include "stems/demucsonnxrunner.h"
 #include "stems/stemaudiosourcereader.h"
@@ -44,7 +43,9 @@ DemucsStemSeparationProcessor::DemucsStemSeparationProcessor(
           m_protectedEntryIdsProvider(
                   std::move(protectedEntryIdsProvider)),
           m_cache(m_settings.cacheDirectoryPath,
-                  m_settings.cacheLimits) {
+                  m_settings.cacheLimits),
+          m_alternateSourceLinker(
+                  m_settings.cacheDirectoryPath) {
 }
 
 DemucsStemSeparationProcessor::~DemucsStemSeparationProcessor() = default;
@@ -79,7 +80,16 @@ DemucsStemSeparationProcessor::process(
 
     error.clear();
     if (m_cache.lookup(request.cacheEntryId, &error).has_value()) {
-        return {Outcome::Completed, {}};
+        if (m_alternateSourceLinker.registerCompleted(
+                    request.sourceFilePath,
+                    request.cacheEntryId,
+                    &error)) {
+            return {Outcome::Completed, {}};
+        }
+        return {
+                Outcome::RetryableFailure,
+                std::move(error),
+        };
     }
     if (!error.isEmpty()) {
         return {
@@ -120,7 +130,8 @@ DemucsStemSeparationProcessor::process(
         if (callbacks.publishState) {
             callbacks.publishState(StemSeparationState::Separating);
         }
-        const auto pipelineResult = pipeline.run(pReader->frameCount(),
+        const auto pipelineResult = pipeline.run(
+                pReader->frameCount(),
                 [&](std::size_t frameOffset,
                         std::span<float> interleavedStereo) {
                     pReader->read(frameOffset, interleavedStereo);
@@ -147,9 +158,7 @@ DemucsStemSeparationProcessor::process(
                         callbacks.publishProgress(progress);
                     }
                 },
-                [&] {
-                    return stopped(callbacks);
-                });
+                [&] { return stopped(callbacks); });
         if (pipelineResult == StemChunkPipeline::Result::Cancelled) {
             writer.cancel();
             return cancelledOrPaused(callbacks);
@@ -171,6 +180,16 @@ DemucsStemSeparationProcessor::process(
                     protectedEntryIds(request.cacheEntryId),
                     &error)) {
             QFile::remove(*outputPath);
+            return {
+                    Outcome::RetryableFailure,
+                    std::move(error),
+            };
+        }
+        if (!m_alternateSourceLinker.registerCompleted(
+                    request.sourceFilePath,
+                    request.cacheEntryId,
+                    &error)) {
+            m_cache.remove(request.cacheEntryId, {}, nullptr);
             return {
                     Outcome::RetryableFailure,
                     std::move(error),
@@ -204,7 +223,9 @@ DemucsStemSeparationProcessor::cancelledOrPaused(
 bool DemucsStemSeparationProcessor::prepareRuntime(
         const Callbacks& callbacks, QString* pErrorMessage) {
     if (!m_cacheInitialized) {
-        if (!m_cache.initialize(pErrorMessage)) {
+        if (!m_cache.initialize(pErrorMessage) ||
+                !m_alternateSourceLinker.initialize(
+                        pErrorMessage)) {
             return false;
         }
         m_cacheInitialized = true;
