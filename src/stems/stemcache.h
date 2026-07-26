@@ -1,13 +1,12 @@
 #pragma once
 
-#include <functional>
-#include <optional>
-
 #include <QByteArray>
 #include <QHash>
 #include <QSet>
 #include <QString>
 #include <QtTypes>
+#include <functional>
+#include <optional>
 
 namespace mixxx::stems {
 
@@ -76,6 +75,9 @@ class StemCache final {
     std::optional<QString> lookup(
             const StemCacheKey& key,
             QString* pErrorMessage = nullptr);
+    std::optional<QString> lookup(
+            const QString& entryId,
+            QString* pErrorMessage = nullptr);
 
     /// Reserves quota and returns the exact final path for a new entry.
     ///
@@ -85,9 +87,16 @@ class StemCache final {
             qint64 maximumNewEntryBytes,
             const QSet<QString>& protectedEntryIds,
             QString* pErrorMessage = nullptr);
+    std::optional<QString> reserve(const QString& entryId,
+            qint64 maximumNewEntryBytes,
+            const QSet<QString>& protectedEntryIds,
+            QString* pErrorMessage = nullptr);
 
     bool registerCompleted(
             const StemCacheKey& key,
+            const QSet<QString>& protectedEntryIds,
+            QString* pErrorMessage = nullptr);
+    bool registerCompleted(const QString& entryId,
             const QSet<QString>& protectedEntryIds,
             QString* pErrorMessage = nullptr);
 

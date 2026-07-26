@@ -1,12 +1,7 @@
 #include "stems/stemcache.h"
 
-#include <algorithm>
-#include <array>
-#include <limits>
-#include <utility>
-
-#include <QCryptographicHash>
 #include <QByteArrayView>
+#include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -18,6 +13,10 @@
 #include <QSaveFile>
 #include <QStorageInfo>
 #include <QtEndian>
+#include <algorithm>
+#include <array>
+#include <limits>
+#include <utility>
 
 #include "util/logger.h"
 
@@ -170,10 +169,19 @@ bool StemCache::initialize(QString* pErrorMessage) {
 
 std::optional<QString> StemCache::lookup(
         const StemCacheKey& key, QString* pErrorMessage) {
+    return lookup(key.id(), pErrorMessage);
+}
+
+std::optional<QString> StemCache::lookup(
+        const QString& entryId, QString* pErrorMessage) {
     if (!checkInitialized(pErrorMessage)) {
         return std::nullopt;
     }
-    const auto entryId = key.id();
+    if (!kEntryIdPattern.match(entryId).hasMatch()) {
+        fail(pErrorMessage,
+                QStringLiteral("Invalid stem cache entry ID"));
+        return std::nullopt;
+    }
     auto entry = m_entries.find(entryId);
     if (entry == m_entries.end()) {
         return std::nullopt;
@@ -196,10 +204,24 @@ std::optional<QString> StemCache::reserve(const StemCacheKey& key,
         qint64 maximumNewEntryBytes,
         const QSet<QString>& protectedEntryIds,
         QString* pErrorMessage) {
+    return reserve(key.id(),
+            maximumNewEntryBytes,
+            protectedEntryIds,
+            pErrorMessage);
+}
+
+std::optional<QString> StemCache::reserve(const QString& entryId,
+        qint64 maximumNewEntryBytes,
+        const QSet<QString>& protectedEntryIds,
+        QString* pErrorMessage) {
     if (!checkInitialized(pErrorMessage)) {
         return std::nullopt;
     }
-    const auto entryId = key.id();
+    if (!kEntryIdPattern.match(entryId).hasMatch()) {
+        fail(pErrorMessage,
+                QStringLiteral("Invalid stem cache entry ID"));
+        return std::nullopt;
+    }
     if (m_entries.contains(entryId)) {
         fail(pErrorMessage,
                 QStringLiteral("Stem cache entry already exists"));
@@ -231,10 +253,20 @@ std::optional<QString> StemCache::reserve(const StemCacheKey& key,
 bool StemCache::registerCompleted(const StemCacheKey& key,
         const QSet<QString>& protectedEntryIds,
         QString* pErrorMessage) {
+    return registerCompleted(
+            key.id(), protectedEntryIds, pErrorMessage);
+}
+
+bool StemCache::registerCompleted(const QString& entryId,
+        const QSet<QString>& protectedEntryIds,
+        QString* pErrorMessage) {
     if (!checkInitialized(pErrorMessage)) {
         return false;
     }
-    const auto entryId = key.id();
+    if (!kEntryIdPattern.match(entryId).hasMatch()) {
+        return fail(pErrorMessage,
+                QStringLiteral("Invalid stem cache entry ID"));
+    }
     if (m_entries.contains(entryId)) {
         return fail(pErrorMessage,
                 QStringLiteral("Stem cache entry is already registered"));

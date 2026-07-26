@@ -1,11 +1,11 @@
-#include "stems/stemcache.h"
-
 #include <gtest/gtest.h>
 
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
 #include <QTemporaryDir>
+
+#include "stems/stemcache.h"
 
 namespace mixxx::stems {
 namespace {
@@ -174,7 +174,7 @@ TEST(StemCacheTest, NeverEvictsProtectedEntries) {
 
     EXPECT_FALSE(cache.reserve(
                               second, 10, QSet<QString>{first.id()}, &error)
-                         .has_value());
+                    .has_value());
     EXPECT_TRUE(QFileInfo::exists(cache.filePath(first.id())));
     EXPECT_FALSE(cache.remove(first.id(),
             QSet<QString>{first.id()},

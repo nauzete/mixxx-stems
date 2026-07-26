@@ -2893,6 +2893,14 @@ if(STEM)
       PRIVATE src/waveform/renderers/allshader/waveformrendererstem.cpp
     )
   endif()
+  if(onnxruntime_FOUND)
+    target_sources(
+      mixxx-lib
+      PRIVATE
+        src/stems/demucsstemseparationprocessor.cpp
+        src/stems/demucsstemseparationprocessor.h
+    )
+  endif()
 endif()
 
 if(BUILD_TESTING)
