@@ -2770,6 +2770,8 @@ target_sources(
   PRIVATE
     src/stems/stemaudiosourcereader.cpp
     src/stems/stemaudiosourcereader.h
+    src/stems/stemcache.cpp
+    src/stems/stemcache.h
     src/stems/stemchunkpipeline.cpp
     src/stems/stemchunkpipeline.h
     src/stems/steminferencerunner.h
@@ -2990,6 +2992,7 @@ if(BUILD_TESTING)
     src/test/signalpathtest.cpp
     src/test/skincontext_test.cpp
     src/test/softtakeover_test.cpp
+    src/test/stemcachetest.cpp
     src/test/stemchunkpipelinetest.cpp
     src/test/soundproxy_test.cpp
     src/test/soundsourceproviderregistrytest.cpp
