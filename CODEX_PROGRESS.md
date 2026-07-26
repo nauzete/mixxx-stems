@@ -122,6 +122,18 @@ All feature branches start from the documented integration baseline.
   normalizes the imported target without changing the dependency or runner.
 - Phase 3 is complete at Mixxx commit `96fd5d8710` and vcpkg commit
   `5f091759f`.
+- Phase 3 was merged into `stems-integration` at `2916939c42`; the combined
+  integration matrix passed with `Ready to merge` in run
+  `https://github.com/nauzete/mixxx-stems/actions/runs/30179260836`.
+- Phase 4 implementation started on `feature/demucs-runner`.
+- The chunk pipeline now performs the official two-pass global normalization,
+  centered final padding, 25% triangular overlap-add, bounded output emission,
+  monotonic progress, and cooperative cancellation.
+- The pipeline owns a fixed 6,879,600-float buffer capacity (about 26.2 MiB)
+  independent of track duration. It never stores a complete track or complete
+  output stems.
+- A background-only source reader uses current Mixxx decoders for bounded
+  stereo 44.1 kHz random reads.
 - No physical hardware test has been run.
 
 ### Phase 1 artifacts
@@ -174,9 +186,8 @@ Downloaded Ubuntu ARM64 DEB SHA-256:
 
 ### Next task
 
-1. Merge the validated Phase 3 component branches into their integration
-   branches.
-2. Begin Phase 4 on `feature/demucs-runner`.
-3. Implement bounded decoding, normalization, segmentation, overlap-add,
-   reusable buffers, progress, and cancellation without touching the audio
-   thread.
+1. Validate Phase 4 on Windows x64 and Ubuntu 24.04 ARM64.
+2. Begin Phase 5 container writing after the focused chunk-pipeline checks
+   pass.
+3. Keep inference, decoding, encoding, and file operations off the real-time
+   audio thread.

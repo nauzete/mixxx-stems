@@ -8,6 +8,8 @@
 #include <string>
 #include <vector>
 
+#include "stems/steminferencerunner.h"
+
 namespace mixxx::stems {
 
 /// Owns a CPU ONNX Runtime session for the exported HTDemucs model.
@@ -15,18 +17,8 @@ namespace mixxx::stems {
 /// Construction and run() perform blocking work and allocate memory. They must
 /// only be called from a background worker, never from the real-time audio
 /// thread.
-class DemucsOnnxRunner final {
+class DemucsOnnxRunner final : public StemInferenceRunner {
   public:
-    static constexpr std::size_t kBatchSize = 1;
-    static constexpr std::size_t kAudioChannelCount = 2;
-    static constexpr std::size_t kSourceCount = 4;
-    static constexpr std::size_t kSegmentSampleCount = 343980;
-    static constexpr std::size_t kInputElementCount =
-            kBatchSize * kAudioChannelCount * kSegmentSampleCount;
-    static constexpr std::size_t kOutputElementCount =
-            kBatchSize * kSourceCount * kAudioChannelCount *
-            kSegmentSampleCount;
-
     struct TensorContract {
         std::string inputName;
         std::string outputName;
@@ -51,7 +43,7 @@ class DemucsOnnxRunner final {
     /// Input layout is [batch, channel, sample]. Output layout is
     /// [batch, source, channel, sample], with source order:
     /// drums, bass, other, vocals.
-    std::vector<float> run(std::span<const float> input) const;
+    std::vector<float> run(std::span<const float> input) const override;
 
     static std::string runtimeVersion();
 
