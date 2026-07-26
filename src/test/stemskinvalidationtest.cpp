@@ -9,6 +9,9 @@
 
 namespace {
 
+const QRegularExpression kLocalResourcePattern(
+        QStringLiteral("skin:/?([^<\"')\\s]+)"));
+
 QString readFile(const QString& path) {
     QFile file(path);
     EXPECT_TRUE(file.open(QIODevice::ReadOnly));
@@ -46,9 +49,8 @@ TEST_F(StemSkinValidationTest, XmlAndLocalResourcesAreValid) {
                 << qPrintable(reader.errorString());
     }
 
-    const QRegularExpression localResource(
-            QStringLiteral("skin:/?([^<\"')\\s]+)"));
-    auto resource = localResource.globalMatch(combinedXml);
+    auto resource =
+            kLocalResourcePattern.globalMatch(combinedXml);
     while (resource.hasNext()) {
         const auto relativePath =
                 resource.next().captured(1);

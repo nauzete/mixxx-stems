@@ -27,6 +27,14 @@
 
 namespace {
 const QRegularExpression kNonWordPattern(QStringLiteral("[^\\w]+"));
+const QRegularExpression kMidiControlPattern(
+        QStringLiteral("<control>([\\s\\S]*?)</control>"));
+const QRegularExpression kMidiStatusPattern(
+        QStringLiteral("<status>([^<]+)</status>"));
+const QRegularExpression kMidiNumberPattern(
+        QStringLiteral("<midino>([^<]+)</midino>"));
+const QRegularExpression kOfficialFlx4NamespacePattern(
+        QStringLiteral("PioneerDDJFLX4(?:\\.|\\s*=)"));
 }
 
 FakeMidiControllerJSProxy::FakeMidiControllerJSProxy()
@@ -268,17 +276,11 @@ QString readControllerResource(const QString& fileName) {
 
 QStringList midiInputAddresses(const QString& xml) {
     QStringList addresses;
-    const QRegularExpression controlPattern(
-            QStringLiteral("<control>([\\s\\S]*?)</control>"));
-    const QRegularExpression statusPattern(
-            QStringLiteral("<status>([^<]+)</status>"));
-    const QRegularExpression midiNoPattern(
-            QStringLiteral("<midino>([^<]+)</midino>"));
-    auto controls = controlPattern.globalMatch(xml);
+    auto controls = kMidiControlPattern.globalMatch(xml);
     while (controls.hasNext()) {
         const auto control = controls.next().captured(1);
-        const auto status = statusPattern.match(control);
-        const auto midiNo = midiNoPattern.match(control);
+        const auto status = kMidiStatusPattern.match(control);
+        const auto midiNo = kMidiNumberPattern.match(control);
         if (status.hasMatch() && midiNo.hasMatch()) {
             addresses.append(status.captured(1) + ":" +
                     midiNo.captured(1));
@@ -305,12 +307,10 @@ TEST(ControllerMappingValidationTest, PioneerDdjFlx4StemsVariant) {
             "filename=\"Pioneer-DDJ-FLX4-Stems-script.js\"")));
     EXPECT_TRUE(stemsScript.contains(
             QStringLiteral("const PioneerDDJFLX4Stems = {};")));
-    EXPECT_FALSE(stemsXml.contains(
-            QRegularExpression(QStringLiteral(
-                    "PioneerDDJFLX4(?:\\.|\\s*=)"))));
-    EXPECT_FALSE(stemsScript.contains(
-            QRegularExpression(QStringLiteral(
-                    "PioneerDDJFLX4(?:\\.|\\s*=)"))));
+    EXPECT_FALSE(
+            stemsXml.contains(kOfficialFlx4NamespacePattern));
+    EXPECT_FALSE(
+            stemsScript.contains(kOfficialFlx4NamespacePattern));
 
     for (const auto& binding : {
                  QStringLiteral("stemsPadsModesStatus"),

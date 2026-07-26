@@ -173,11 +173,20 @@ jobs:
           if ($actual -ne $env:HTDEMUCS_SHA256) {
             throw "Unexpected model SHA-256: $actual"
           }
-          & build/onnx-smoke/Release/demucs-onnx-smoke.exe model/htdemucs.onnx
+          $smoke = Get-ChildItem build/onnx-smoke -Recurse `
+            -Filter demucs-onnx-smoke.exe |
+            Select-Object -First 1 -ExpandProperty FullName
+          $benchmark = Get-ChildItem build/onnx-smoke -Recurse `
+            -Filter demucs-onnx-benchmark.exe |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (!$smoke -or !$benchmark) {
+            throw "Real-model validation executables are missing"
+          }
+          & $smoke model/htdemucs.onnx
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
-          & build/onnx-smoke/Release/demucs-onnx-benchmark.exe `
+          & $benchmark `
             model/htdemucs.onnx 2 build/benchmark-windows-x64.json
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
@@ -191,7 +200,7 @@ jobs:
       - name: Create MSI and portable ZIP
         shell: pwsh
         run: |
-          cpack --config build/CPackConfig.cmake -G WIX -V
+          cpack --config build/CPackConfig.cmake -B build -G WIX -V
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
@@ -362,7 +371,7 @@ jobs:
             model/htdemucs.onnx 2 build/benchmark-ubuntu-arm64.json
 
       - name: Create ARM64 DEB
-        run: cpack --config build/CPackConfig.cmake -G DEB -V
+        run: cpack --config build/CPackConfig.cmake -B build -G DEB -V
 
       - name: Validate and install ARM64 DEB
         run: |

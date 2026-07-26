@@ -28,7 +28,8 @@ bool waitUntil(const std::function<bool()>& predicate,
 }
 
 StemSeparationRequest request(
-        QString name, StemSeparationPriority priority) {
+        const QString& name,
+        StemSeparationPriority priority) {
     return {
             QStringLiteral("/music/") + name + QStringLiteral(".wav"),
             name.repeated(64).left(64),
