@@ -200,9 +200,14 @@ jobs:
       - name: Create MSI and portable ZIP
         shell: pwsh
         run: |
-          cpack --config build/CPackConfig.cmake -B build -G WIX -V
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          Push-Location build
+          cpack -G WIX -V
+          $cpackExitCode = $LASTEXITCODE
+          Pop-Location
+          if ($cpackExitCode -ne 0) {
+            Get-Content build/_CPack_Packages/win64/WIX/wix.log `
+              -ErrorAction SilentlyContinue
+            exit $cpackExitCode
           }
           cmake --install build --config RelWithDebInfo `
             --prefix "${{ github.workspace }}\build\portable"
@@ -258,7 +263,6 @@ jobs:
         uses: actions/upload-artifact@v7.0.1
         with:
           name: Mixxx-Stems-Windows-x64
-          archive: "false"
           path: |
             build/Mixxx-Stems-x64.msi
             build/Mixxx-Stems-x64.msi.sha256
@@ -401,7 +405,6 @@ jobs:
         uses: actions/upload-artifact@v7.0.1
         with:
           name: Mixxx-Stems-Ubuntu-ARM64
-          archive: "false"
           path: |
             build/mixxx-stems_*_arm64.deb
             build/mixxx-stems_*_arm64.deb.sha256
