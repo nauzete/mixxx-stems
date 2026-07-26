@@ -1,5 +1,9 @@
 # Mixxx
 
+> **Mixxx Stems fork:** This repository is not an official Mixxx release.
+> See [the stems overview](docs/stems-overview.md) for its background local
+> separation architecture, supported packages, and hardware limitations.
+
 [![GitHub latest tag](https://img.shields.io/github/tag/mixxxdj/mixxx.svg)](https://mixxx.org/download)
 [![Packaging status](https://repology.org/badge/tiny-repos/mixxx.svg)](https://repology.org/metapackage/mixxx/versions)
 [![Build status](https://github.com/mixxxdj/mixxx/actions/workflows/build.yml/badge.svg)](https://github.com/mixxxdj/mixxx/actions/workflows/build.yml)

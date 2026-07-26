@@ -144,6 +144,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
+          & build/onnx-smoke/Release/demucs-onnx-benchmark.exe `
+            model/htdemucs.onnx 2 build/benchmark-windows-x64.json
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
 
       - name: Install WiX Toolset
         run: |
@@ -217,6 +222,7 @@ jobs:
             build/Mixxx-Stems-x64.msi.sha256
             build/Mixxx-Stems-x64-portable.zip
             build/Mixxx-Stems-x64-portable.zip.sha256
+            build/benchmark-windows-x64.json
 
   ubuntu-arm64:
     name: Ubuntu ARM64 DEB
@@ -319,6 +325,8 @@ jobs:
             --dir model
           echo "${HTDEMUCS_SHA256}  model/htdemucs.onnx" | sha256sum --check
           build/onnx-smoke/demucs-onnx-smoke model/htdemucs.onnx
+          build/onnx-smoke/demucs-onnx-benchmark \
+            model/htdemucs.onnx 2 build/benchmark-ubuntu-arm64.json
 
       - name: Create ARM64 DEB
         run: cpack --config build/CPackConfig.cmake -G DEB -V
@@ -355,6 +363,7 @@ jobs:
           path: |
             build/mixxx-stems_*_arm64.deb
             build/mixxx-stems_*_arm64.deb.sha256
+            build/benchmark-ubuntu-arm64.json
 
   release:
     name: Publish tagged release
