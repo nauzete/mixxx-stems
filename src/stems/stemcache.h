@@ -68,7 +68,8 @@ class StemCache final {
         qint64 maximumTrackBytes = kDefaultMaximumTrackBytes;
     };
 
-    explicit StemCache(QString directoryPath, Limits limits = {});
+    explicit StemCache(QString directoryPath);
+    StemCache(QString directoryPath, Limits limits);
 
     bool initialize(QString* pErrorMessage = nullptr);
 

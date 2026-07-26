@@ -323,7 +323,8 @@ TEST(ControllerMappingValidationTest, PioneerDdjFlx4StemsVariant) {
                  QStringLiteral("separation_state"),
                  QStringLiteral("sendKeepAlive"),
          }) {
-        EXPECT_TRUE(stemsScript.contains(binding)) << binding;
+        EXPECT_TRUE(stemsScript.contains(binding))
+                << binding.toStdString();
     }
 
     // The variant changes handlers, never MIDI addresses. This guards against

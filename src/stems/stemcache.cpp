@@ -130,6 +130,10 @@ std::optional<StemCacheKey> StemCacheKey::fromSourceFile(
     };
 }
 
+StemCache::StemCache(QString directoryPath)
+        : StemCache(std::move(directoryPath), Limits{}) {
+}
+
 StemCache::StemCache(QString directoryPath, Limits limits)
         : m_directoryPath(
                   QDir::cleanPath(std::move(directoryPath))),

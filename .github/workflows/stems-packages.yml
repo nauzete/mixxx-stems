@@ -72,6 +72,31 @@ jobs:
         shell: cmd
         run: tools\windows_buildenv.bat setup
 
+      - name: Restore missing Mixxx build environment
+        shell: pwsh
+        run: |
+          $toolchain = Join-Path $env:MIXXX_VCPKG_ROOT `
+            "scripts\buildsystems\vcpkg.cmake"
+          if (!(Test-Path $toolchain)) {
+            $archive = Join-Path $env:RUNNER_TEMP "mixxx-buildenv.zip"
+            curl.exe --fail --location --retry 3 `
+              --output $archive $env:BUILDENV_URL
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+            $actual = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+            if ($actual -ne $env:BUILDENV_SHA256) {
+              throw "Unexpected Mixxx build environment SHA-256: $actual"
+            }
+            7z.exe x -y "-o$env:BUILDENV_BASEPATH" $archive
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
+          if (!(Test-Path $toolchain)) {
+            throw "Mixxx vcpkg toolchain is missing after environment setup"
+          }
+
       - name: Bootstrap pinned vcpkg
         run: .\bootstrap-vcpkg.bat
         working-directory: _deps/vcpkg-stems
