@@ -36,7 +36,11 @@ namespace {
 const QVersionNumber kMixxxVersionNumber = QVersionNumber(
         MIXXX_VERSION_MAJOR, MIXXX_VERSION_MINOR, MIXXX_VERSION_PATCH);
 const QString kMixxxVersionSuffix = QStringLiteral(MIXXX_VERSION_SUFFIX);
+#ifdef MIXXX_STEMS_BUILD
+const QString kMixxx = QStringLiteral("Mixxx Stems");
+#else
 const QString kMixxx = QStringLiteral("Mixxx");
+#endif
 const QString kBuildFlags = QStringLiteral(MIXXX_BUILD_FLAGS);
 
 QString ebur128Version() {
