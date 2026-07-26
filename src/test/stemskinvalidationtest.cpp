@@ -73,7 +73,7 @@ TEST_F(StemSkinValidationTest,
     const auto rowXml =
             readFile(skinDirectory.filePath(
                     QStringLiteral("stem_row.xml")));
-    const auto allStemXml =
+    const QString allStemXml =
             stemsXml + deckXml + rowXml;
 
     EXPECT_TRUE(skinXml.contains(

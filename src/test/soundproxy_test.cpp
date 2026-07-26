@@ -205,8 +205,10 @@ TEST_F(SoundSourceProxyTest, open) {
 #ifdef __STEM__
 TEST_F(SoundSourceProxyTest,
         alternateAudioSourceRetainsLogicalTrack) {
-    const auto logicalFilePath = getTestFile(".flac");
-    const auto alternateFilePath = getTestFile(".stem.mp4");
+    const auto logicalFilePath =
+            getTestFile(QStringLiteral(".flac"));
+    const auto alternateFilePath =
+            getTestFile(QStringLiteral(".stem.mp4"));
     auto pTrack = Track::newTemporary(logicalFilePath);
     pTrack->setTitle(QStringLiteral("Original library metadata"));
 
