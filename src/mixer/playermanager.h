@@ -28,6 +28,12 @@ class SamplerBank;
 class SoundManager;
 class ControlProxy;
 
+#if defined(__STEM__) && defined(MIXXX_USE_ONNXRUNTIME)
+namespace mixxx::stems {
+class StemStatusControlProvider;
+}
+#endif
+
 // For mocking PlayerManager
 class PlayerManagerInterface : public QObject {
     Q_OBJECT
@@ -296,6 +302,10 @@ class PlayerManager : public PlayerManagerInterface {
     std::unique_ptr<ControlObject> m_pCONumPreviewDecks;
     std::unique_ptr<ControlObject> m_pCONumMicrophones;
     std::unique_ptr<ControlObject> m_pCONumAuxiliaries;
+#if defined(__STEM__) && defined(MIXXX_USE_ONNXRUNTIME)
+    std::unique_ptr<mixxx::stems::StemStatusControlProvider>
+            m_pStemStatusControlProvider;
+#endif
     parented_ptr<ControlProxy> m_pAutoDjEnabled;
 
     TrackAnalysisScheduler::Pointer m_pTrackAnalysisScheduler;

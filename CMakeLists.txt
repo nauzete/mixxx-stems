@@ -2805,7 +2805,7 @@ if(ONNXRUNTIME)
     PRIVATE src/stems/demucsonnxrunner.cpp src/stems/demucsonnxrunner.h
   )
   target_link_libraries(mixxx-lib PRIVATE onnxruntime::onnxruntime)
-  target_compile_definitions(mixxx-lib PRIVATE MIXXX_USE_ONNXRUNTIME)
+  target_compile_definitions(mixxx-lib PUBLIC MIXXX_USE_ONNXRUNTIME)
 endif()
 
 # FFmpeg support
@@ -2897,12 +2897,14 @@ if(STEM)
       PRIVATE src/waveform/renderers/allshader/waveformrendererstem.cpp
     )
   endif()
-  if(onnxruntime_FOUND)
+  if(ONNXRUNTIME)
     target_sources(
       mixxx-lib
       PRIVATE
         src/stems/demucsstemseparationprocessor.cpp
         src/stems/demucsstemseparationprocessor.h
+        src/stems/stemstatuscontrolprovider.cpp
+        src/stems/stemstatuscontrolprovider.h
     )
   endif()
 endif()
@@ -3041,6 +3043,9 @@ if(BUILD_TESTING)
       src/test/stemcontrolobjecttest.cpp
       src/test/stemcontainerwritertest.cpp
     )
+    if(ONNXRUNTIME)
+      list(APPEND src-mixxx-test src/test/stemstatuscontrolprovidertest.cpp)
+    endif()
   endif()
   if(BUILD_BENCH)
     set(
