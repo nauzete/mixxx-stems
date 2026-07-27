@@ -16,7 +16,7 @@ namespace {
 
 class SoundSourceStemLiveTest
         : public MixxxTest,
-          SoundSourceProviderRegistration {
+          ::SoundSourceProviderRegistration {
 };
 
 TEST_F(SoundSourceStemLiveTest,
