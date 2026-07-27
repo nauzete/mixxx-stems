@@ -104,7 +104,8 @@ SoundSourceStemLive::readSampleFramesClamped(
                     m_originalBuffer.data(),
                     originalSampleCount));
     const auto original =
-            m_pOriginalSource->readSampleFrames(
+            readSampleFramesClampedOn(
+                    *m_pOriginalSource,
                     originalFrames);
     auto* const pOutput = sampleFrames.writableData();
     SampleUtil::clear(

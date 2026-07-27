@@ -375,7 +375,8 @@ void StemStatusControlProvider::registerDeck(
             [this, group](const TrackPointer& pTrack) {
                 const auto pDeckState = deckState(group);
                 if (pTrack && pDeckState &&
-                        pTrack->hasStem()) {
+                        pTrack->hasStem() &&
+                        pDeckState->liveSessionId.isEmpty()) {
                     pDeckState->pLiveReady
                             ->setAndConfirm(1.0);
                     pDeckState->pState->setAndConfirm(

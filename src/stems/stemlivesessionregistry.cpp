@@ -220,10 +220,10 @@ void StemLiveSessionRegistry::removeStaleFiles(
             ++session;
         }
     }
-    for (const auto& fileName :
-            directory.entryList(
-                    {QStringLiteral("*.stemlive.pcm")},
-                    QDir::Files)) {
+    const auto fileNames = directory.entryList(
+            {QStringLiteral("*.stemlive.pcm")},
+            QDir::Files);
+    for (const auto& fileName : fileNames) {
         auto sessionId = fileName;
         sessionId.chop(
                 QStringLiteral(".stemlive.pcm").size());
