@@ -234,7 +234,8 @@ jobs:
             throw "Portable ONNX Runtime DLL is missing"
           }
           $headers = dumpbin /headers "$portable\mixxx.exe" | Out-String
-          if ($headers -notmatch "8664 machine \\(x64\\)") {
+          $headers | Write-Output
+          if ($headers -notmatch "8664 machine \(x64\)") {
             throw "Portable executable is not x64"
           }
           & "$portable\mixxx.exe" --help
