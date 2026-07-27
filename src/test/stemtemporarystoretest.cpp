@@ -1,8 +1,9 @@
+#include <gtest/gtest.h>
+
 #include <QFile>
 #include <QFileInfo>
 #include <QTemporaryDir>
 #include <QtEndian>
-#include <gtest/gtest.h>
 #include <array>
 #include <cmath>
 

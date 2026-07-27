@@ -1,8 +1,7 @@
 #include "engine/channels/enginedeck.h"
 
-#include <algorithm>
-
 #include <QStringView>
+#include <algorithm>
 
 #include "control/controlpushbutton.h"
 #include "effects/effectsmanager.h"
@@ -105,9 +104,9 @@ EngineDeck::EngineDeck(
                             ++otherStemIdx) {
                         m_stemSolo[otherStemIdx]->setAndConfirm(
                                 value > 0.0 &&
-                                        otherStemIdx == stemIdx
-                                ? 1.0
-                                : 0.0);
+                                                otherStemIdx == stemIdx
+                                        ? 1.0
+                                        : 0.0);
                     }
                 },
                 Qt::DirectConnection);

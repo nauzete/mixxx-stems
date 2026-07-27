@@ -7,8 +7,8 @@ decoding, ONNX inference, callbacks, and allocations may all block.
 ## Audio and tensor contract
 
 - decoded input: stereo float32 at 44,100 Hz;
-- model segment: fixed by the validated model manifest; the low-latency export
-  uses 114,660 frames (2.6 seconds), while the runner remains compatible with
+- model segment: fixed by the validated model manifest; the balanced export
+  uses 171,990 frames (3.9 seconds), while the runner remains compatible with
   the official 343,980-frame model;
 - overlap: 25%;
 - stride: 75% of the model segment;
@@ -51,7 +51,7 @@ trimmed before overlap-add, matching `TensorChunk.padded()` and
 ## Memory and cancellation
 
 Pipeline-owned storage is proportional only to the fixed model segment and is
-independent of track duration. The 2.6-second variant uses one third of the
+independent of track duration. The 3.9-second variant uses one half of the
 pipeline buffer capacity of the official 7.8-second export. ONNX Runtime owns
 its separate session and output allocations.
 

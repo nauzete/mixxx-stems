@@ -46,7 +46,7 @@ SoundSource::OpenResult SoundSourceStemLive::tryOpen(
 
     m_requestedChannelCount =
             params.getSignalInfo().getChannelCount() ==
-                            audio::ChannelCount::stereo()
+                    audio::ChannelCount::stereo()
             ? audio::ChannelCount::stereo()
             : audio::ChannelCount::stem();
     initChannelCountOnce(m_requestedChannelCount);
@@ -192,8 +192,8 @@ bool SoundSourceStemLive::copyPublishedFrames(
                     m_stemBytes.constData());
     for (std::size_t sample = 0;
             sample <
-                    readableFrameCount *
-                            kStemChannelCount;
+            readableFrameCount *
+                    kStemChannelCount;
             ++sample) {
         pOutput[sample] =
                 static_cast<float>(

@@ -88,8 +88,7 @@ bool StemTemporaryStore::append(
         std::span<const float> planarStems,
         QString* pErrorMessage) {
     if (!m_pSession || !m_file.isOpen() || frameCount == 0 ||
-            frameOffset != m_pSession->readyFrameCount.load(
-                                   std::memory_order_acquire) ||
+            frameOffset != m_pSession->readyFrameCount.load(std::memory_order_acquire) ||
             frameOffset > m_pSession->totalFrameCount ||
             frameCount >
                     m_pSession->totalFrameCount - frameOffset ||

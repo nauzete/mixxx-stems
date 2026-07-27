@@ -1,6 +1,7 @@
+#include <gtest/gtest.h>
+
 #include <QFile>
 #include <QTemporaryDir>
-#include <gtest/gtest.h>
 #include <array>
 
 #include "sources/soundsourcestemlive.h"
@@ -107,13 +108,13 @@ TEST_F(SoundSourceStemLiveTest,
             SoundSource::OpenResult::Succeeded);
     std::array<CSAMPLE, 8> fallback{};
     ASSERT_EQ(source.readSampleFrames(
-                      WritableSampleFrames(
-                              IndexRange::forward(
-                                      source.frameIndexMin(),
-                                      1),
-                              SampleBuffer::WritableSlice(
-                                      fallback.data(),
-                                      fallback.size())))
+                            WritableSampleFrames(
+                                    IndexRange::forward(
+                                            source.frameIndexMin(),
+                                            1),
+                                    SampleBuffer::WritableSlice(
+                                            fallback.data(),
+                                            fallback.size())))
                       .readableLength(),
             8);
 
@@ -139,13 +140,13 @@ TEST_F(SoundSourceStemLiveTest,
 
     std::array<CSAMPLE, 8> hotOutput{};
     ASSERT_EQ(source.readSampleFrames(
-                      WritableSampleFrames(
-                              IndexRange::forward(
-                                      source.frameIndexMin(),
-                                      1),
-                              SampleBuffer::WritableSlice(
-                                      hotOutput.data(),
-                                      hotOutput.size())))
+                            WritableSampleFrames(
+                                    IndexRange::forward(
+                                            source.frameIndexMin(),
+                                            1),
+                                    SampleBuffer::WritableSlice(
+                                            hotOutput.data(),
+                                            hotOutput.size())))
                       .readableLength(),
             8);
     for (std::size_t index = 0;

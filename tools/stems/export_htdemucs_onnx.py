@@ -172,7 +172,7 @@ def export_short_segment_variant(
     output_dir: Path,
     segment_samples: int,
 ) -> Path:
-    """Export the official weights without padding back to the train segment."""
+    """Export official weights without padding to the train segment."""
     core_model.onnx_exportable = True
     core_model.use_train_segment = False
     dummy_input = torch.randn(1, 2, segment_samples)
@@ -475,9 +475,9 @@ def run_parity(
                 f"{fixture_name}: short segment vs official padded reference",
                 short_segment_metrics,
             )
-            fixture_results[
-                "short_segment_vs_official_padded_reference"
-            ] = short_segment_metrics
+            fixture_results["short_segment_vs_official_padded_reference"] = (
+                short_segment_metrics
+            )
         if fixture_name == "synthetic":
             pytorch_native = torch_inference(
                 core_model,

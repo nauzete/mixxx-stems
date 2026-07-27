@@ -66,7 +66,7 @@ jobs:
           python tools/stems/export_htdemucs_onnx.py \
             --demucs-dir _deps/demucs \
             --demucs-commit "${DEMUCS_COMMIT}" \
-            --segment-seconds 2.6 \
+            --segment-seconds 3.9 \
             --output-dir model-export-output
 
       - name: Verify checksums
