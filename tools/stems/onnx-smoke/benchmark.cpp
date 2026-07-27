@@ -65,14 +65,14 @@ std::string makeReport(double elapsedSeconds,
         double realTimeFactor,
         std::uint64_t peakRssBytes,
         int threadCount,
+        std::size_t segmentSampleCount,
         float maximumAbsoluteOutput) {
     std::ostringstream report;
     report << std::fixed << std::setprecision(6)
            << "{\n"
            << "  \"architecture\": \"" << architectureName() << "\",\n"
            << "  \"audio_seconds\": "
-           << mixxx::stems::DemucsOnnxRunner::kSegmentSampleCount /
-                    kSampleRate
+           << segmentSampleCount / kSampleRate
            << ",\n"
            << "  \"elapsed_seconds\": " << elapsedSeconds << ",\n"
            << "  \"intra_op_threads\": " << threadCount << ",\n"
@@ -107,32 +107,29 @@ int main(int argc, char** argv) {
                     "Thread count must be positive");
         }
 
-        std::vector<float> input(
-                mixxx::stems::DemucsOnnxRunner::kInputElementCount);
+        mixxx::stems::DemucsOnnxRunner runner(
+                modelPath, threadCount);
+        const auto segmentSampleCount =
+                runner.segmentSampleCount();
+        std::vector<float> input(runner.inputElementCount());
         for (std::size_t sample = 0;
-                sample <
-                mixxx::stems::DemucsOnnxRunner::kSegmentSampleCount;
+                sample < segmentSampleCount;
                 ++sample) {
             const auto time =
                     static_cast<double>(sample) / kSampleRate;
             input[sample] = static_cast<float>(
                     0.1 * std::sin(2.0 * std::numbers::pi * 440.0 * time));
-            input[mixxx::stems::DemucsOnnxRunner::kSegmentSampleCount +
-                    sample] = static_cast<float>(0.1 *
-                    std::sin(2.0 * std::numbers::pi * 660.0 * time));
+            input[segmentSampleCount + sample] =
+                    static_cast<float>(0.1 *
+                            std::sin(2.0 * std::numbers::pi * 660.0 * time));
         }
-
-        mixxx::stems::DemucsOnnxRunner runner(
-                modelPath, threadCount);
         const auto start = std::chrono::steady_clock::now();
         const auto output = runner.run(input);
         const auto elapsed =
                 std::chrono::duration<double>(
                         std::chrono::steady_clock::now() - start)
                         .count();
-        if (output.size() !=
-                        mixxx::stems::DemucsOnnxRunner::
-                                kOutputElementCount ||
+        if (output.size() != runner.outputElementCount() ||
                 !std::all_of(output.begin(),
                         output.end(),
                         [](float sample) {
@@ -147,13 +144,12 @@ int main(int argc, char** argv) {
                     return std::abs(left) < std::abs(right);
                 });
         const auto audioSeconds =
-                mixxx::stems::DemucsOnnxRunner::
-                        kSegmentSampleCount /
-                kSampleRate;
+                segmentSampleCount / kSampleRate;
         const auto report = makeReport(elapsed,
                 elapsed / audioSeconds,
                 peakResidentSetBytes(),
                 threadCount,
+                segmentSampleCount,
                 std::abs(*maximum));
         std::cout << report;
         if (argc == 4) {

@@ -10,17 +10,9 @@
 namespace mixxx::stems {
 namespace {
 
-constexpr std::array<int64_t, 3> kExpectedInputShape = {
-        static_cast<int64_t>(DemucsOnnxRunner::kBatchSize),
-        static_cast<int64_t>(DemucsOnnxRunner::kAudioChannelCount),
-        static_cast<int64_t>(DemucsOnnxRunner::kSegmentSampleCount),
-};
-constexpr std::array<int64_t, 4> kExpectedOutputShape = {
-        static_cast<int64_t>(DemucsOnnxRunner::kBatchSize),
-        static_cast<int64_t>(DemucsOnnxRunner::kSourceCount),
-        static_cast<int64_t>(DemucsOnnxRunner::kAudioChannelCount),
-        static_cast<int64_t>(DemucsOnnxRunner::kSegmentSampleCount),
-};
+constexpr std::size_t kMinimumSegmentSampleCount = 44100;
+constexpr std::size_t kMaximumSegmentSampleCount =
+        DemucsOnnxRunner::kDefaultSegmentSampleCount;
 
 Ort::SessionOptions makeSessionOptions(int intraOpThreadCount) {
     if (intraOpThreadCount < 1) {
@@ -32,6 +24,12 @@ Ort::SessionOptions makeSessionOptions(int intraOpThreadCount) {
     options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
     options.SetIntraOpNumThreads(intraOpThreadCount);
     options.SetInterOpNumThreads(1);
+#if defined(_M_ARM64) || defined(__aarch64__)
+    // HTDemucs activations dominate peak memory on 4 GiB Raspberry Pi
+    // systems. Direct CPU allocations trade some inference latency for a
+    // substantially lower peak than the reusable arena.
+    options.DisableCpuMemArena();
+#endif
     options.SetGraphOptimizationLevel(
             GraphOptimizationLevel::ORT_ENABLE_ALL);
     return options;
@@ -48,34 +46,6 @@ std::string shapeString(std::span<const int64_t> shape) {
     }
     stream << ']';
     return stream.str();
-}
-
-template<std::size_t Size>
-void requireExactShape(
-        const std::vector<int64_t>& actual,
-        const std::array<int64_t, Size>& expected,
-        const char* tensorName) {
-    if (!std::equal(actual.begin(),
-                actual.end(),
-                expected.begin(),
-                expected.end())) {
-        throw std::runtime_error(std::string("Unexpected ") + tensorName +
-                " shape: " + shapeString(actual));
-    }
-}
-
-void requireDeclaredOutputShape(const std::vector<int64_t>& actual) {
-    if (actual.size() != kExpectedOutputShape.size()) {
-        throw std::runtime_error(
-                "Unexpected output rank: " + shapeString(actual));
-    }
-    for (std::size_t index = 0; index < actual.size(); ++index) {
-        if (actual[index] != -1 && actual[index] != kExpectedOutputShape[index]) {
-            throw std::runtime_error(
-                    "Unexpected declared output shape: " +
-                    shapeString(actual));
-        }
-    }
 }
 
 void requireFloatTensor(
@@ -126,9 +96,42 @@ class DemucsOnnxRunner::Impl final {
                 inputType.GetTensorTypeAndShapeInfo().GetShape();
         m_contract.declaredOutputShape =
                 outputType.GetTensorTypeAndShapeInfo().GetShape();
-        requireExactShape(
-                m_contract.inputShape, kExpectedInputShape, "input");
-        requireDeclaredOutputShape(m_contract.declaredOutputShape);
+        if (m_contract.inputShape.size() != 3 ||
+                m_contract.inputShape[0] !=
+                        static_cast<int64_t>(kBatchSize) ||
+                m_contract.inputShape[1] !=
+                        static_cast<int64_t>(kAudioChannelCount) ||
+                m_contract.inputShape[2] <
+                        static_cast<int64_t>(kMinimumSegmentSampleCount) ||
+                m_contract.inputShape[2] >
+                        static_cast<int64_t>(kMaximumSegmentSampleCount)) {
+            throw std::runtime_error(
+                    "Unexpected input shape: " +
+                    shapeString(m_contract.inputShape));
+        }
+        const std::array<int64_t, 4> expectedOutputShape = {
+                static_cast<int64_t>(kBatchSize),
+                static_cast<int64_t>(kSourceCount),
+                static_cast<int64_t>(kAudioChannelCount),
+                m_contract.inputShape[2],
+        };
+        if (m_contract.declaredOutputShape.size() !=
+                expectedOutputShape.size()) {
+            throw std::runtime_error(
+                    "Unexpected output rank: " +
+                    shapeString(m_contract.declaredOutputShape));
+        }
+        for (std::size_t index = 0;
+                index < expectedOutputShape.size();
+                ++index) {
+            if (m_contract.declaredOutputShape[index] != -1 &&
+                    m_contract.declaredOutputShape[index] !=
+                            expectedOutputShape[index]) {
+                throw std::runtime_error(
+                        "Unexpected declared output shape: " +
+                        shapeString(m_contract.declaredOutputShape));
+            }
+        }
     }
 
     TensorContract m_contract;
@@ -151,20 +154,36 @@ const DemucsOnnxRunner::TensorContract& DemucsOnnxRunner::contract()
     return m_pImpl->m_contract;
 }
 
+std::size_t DemucsOnnxRunner::segmentSampleCount() const noexcept {
+    return static_cast<std::size_t>(
+            m_pImpl->m_contract.inputShape[2]);
+}
+
 std::vector<float> DemucsOnnxRunner::run(
         std::span<const float> input) const {
-    if (input.size() != kInputElementCount) {
+    if (input.size() != inputElementCount()) {
         throw std::invalid_argument(
                 "HTDemucs input contains an unexpected number of elements");
     }
+    const std::array<int64_t, 3> inputShape = {
+            static_cast<int64_t>(kBatchSize),
+            static_cast<int64_t>(kAudioChannelCount),
+            static_cast<int64_t>(segmentSampleCount()),
+    };
+    const std::array<int64_t, 4> outputShape = {
+            static_cast<int64_t>(kBatchSize),
+            static_cast<int64_t>(kSourceCount),
+            static_cast<int64_t>(kAudioChannelCount),
+            static_cast<int64_t>(segmentSampleCount()),
+    };
 
     const auto memoryInfo =
             Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
     auto inputTensor = Ort::Value::CreateTensor<float>(memoryInfo,
             const_cast<float*>(input.data()),
             input.size(),
-            kExpectedInputShape.data(),
-            kExpectedInputShape.size());
+            inputShape.data(),
+            inputShape.size());
     const std::array inputNames = {m_pImpl->m_contract.inputName.c_str()};
     const std::array outputNames = {m_pImpl->m_contract.outputName.c_str()};
     auto outputs = m_pImpl->m_session.Run(Ort::RunOptions{nullptr},
@@ -183,15 +202,20 @@ std::vector<float> DemucsOnnxRunner::run(
             ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
         throw std::runtime_error("ONNX Runtime returned a non-float output");
     }
-    requireExactShape(
-            outputInfo.GetShape(), kExpectedOutputShape, "runtime output");
-    if (outputInfo.GetElementCount() != kOutputElementCount) {
+    if (outputInfo.GetShape() !=
+            std::vector<int64_t>(
+                    outputShape.begin(), outputShape.end())) {
+        throw std::runtime_error(
+                "Unexpected runtime output shape: " +
+                shapeString(outputInfo.GetShape()));
+    }
+    if (outputInfo.GetElementCount() != outputElementCount()) {
         throw std::runtime_error(
                 "ONNX Runtime returned an unexpected output element count");
     }
 
     const auto* const outputData = outputs.front().GetTensorData<float>();
-    return {outputData, outputData + kOutputElementCount};
+    return {outputData, outputData + outputElementCount()};
 }
 
 std::string DemucsOnnxRunner::runtimeVersion() {

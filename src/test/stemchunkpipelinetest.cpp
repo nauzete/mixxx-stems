@@ -20,18 +20,28 @@ constexpr std::size_t kSegmentFrameCount =
 
 class IdentityRunner final : public StemInferenceRunner {
   public:
+    explicit IdentityRunner(
+            std::size_t segmentSampleCount = kSegmentFrameCount)
+            : m_segmentSampleCount(segmentSampleCount) {
+    }
+
+    std::size_t segmentSampleCount() const noexcept override {
+        return m_segmentSampleCount;
+    }
+
     std::vector<float> run(std::span<const float> input) const override {
         ++m_runCount;
-        std::vector<float> output(kOutputElementCount);
+        std::vector<float> output(outputElementCount());
         for (std::size_t source = 0; source < kSourceCount; ++source) {
             for (std::size_t channel = 0; channel < kChannelCount;
                     ++channel) {
-                const auto inputOffset = channel * kSegmentFrameCount;
+                const auto inputOffset =
+                        channel * m_segmentSampleCount;
                 const auto outputOffset =
                         (source * kChannelCount + channel) *
-                        kSegmentFrameCount;
+                        m_segmentSampleCount;
                 std::copy_n(input.begin() + inputOffset,
-                        kSegmentFrameCount,
+                        m_segmentSampleCount,
                         output.begin() + outputOffset);
             }
         }
@@ -39,6 +49,9 @@ class IdentityRunner final : public StemInferenceRunner {
     }
 
     mutable std::size_t m_runCount = 0;
+
+  private:
+    const std::size_t m_segmentSampleCount;
 };
 
 std::vector<float> makeStereo(std::size_t frameCount) {
@@ -65,6 +78,7 @@ TEST(StemChunkPipelineTest, ReconstructsAcrossOverlapAndFinalPadding) {
     std::vector<float> progressValues;
     std::size_t expectedWriteOffset = 0;
     std::size_t maximumReadFrameCount = 0;
+    std::size_t readCallbackCount = 0;
     IdentityRunner runner;
     StemChunkPipeline pipeline(runner);
     const auto capacityBefore = pipeline.allocatedSampleCapacity();
@@ -72,6 +86,7 @@ TEST(StemChunkPipelineTest, ReconstructsAcrossOverlapAndFinalPadding) {
     const auto result = pipeline.run(
             frameCount,
             [&](std::size_t offset, std::span<float> destination) {
+                ++readCallbackCount;
                 ASSERT_EQ(destination.size() % kChannelCount, 0U);
                 const auto readFrameCount =
                         destination.size() / kChannelCount;
@@ -99,6 +114,7 @@ TEST(StemChunkPipelineTest, ReconstructsAcrossOverlapAndFinalPadding) {
     EXPECT_EQ(result, StemChunkPipeline::Result::Completed);
     EXPECT_EQ(expectedWriteOffset, frameCount);
     EXPECT_EQ(runner.m_runCount, 2U);
+    EXPECT_EQ(readCallbackCount, 2U);
     EXPECT_LE(maximumReadFrameCount, kSegmentFrameCount);
     EXPECT_EQ(pipeline.allocatedSampleCapacity(), capacityBefore);
     ASSERT_FALSE(progressValues.empty());
@@ -121,11 +137,10 @@ TEST(StemChunkPipelineTest, ReconstructsAcrossOverlapAndFinalPadding) {
 }
 
 TEST(StemChunkPipelineTest, CancelsBeforeInference) {
-    const auto frameCount = StemChunkPipeline::kStatisticsBlockSampleCount;
+    const auto frameCount = kSegmentFrameCount;
     const auto input = makeStereo(frameCount);
     IdentityRunner runner;
     StemChunkPipeline pipeline(runner);
-    bool cancel = false;
 
     const auto result = pipeline.run(
             frameCount,
@@ -137,8 +152,8 @@ TEST(StemChunkPipelineTest, CancelsBeforeInference) {
             [](std::size_t, std::size_t, std::span<const float>) {
                 throw std::logic_error("Cancelled pipeline wrote output");
             },
-            [&](float progress) { cancel = progress >= 0.1F; },
-            [&] { return cancel; });
+            {},
+            [] { return true; });
 
     EXPECT_EQ(result, StemChunkPipeline::Result::Cancelled);
     EXPECT_EQ(runner.m_runCount, 0U);
@@ -157,6 +172,21 @@ TEST(StemChunkPipelineTest, EmptyInputCompletesWithoutCallbacks) {
     EXPECT_EQ(result, StemChunkPipeline::Result::Completed);
     EXPECT_FLOAT_EQ(progress, 1.0F);
     EXPECT_EQ(runner.m_runCount, 0U);
+}
+
+TEST(StemChunkPipelineTest, UsesRunnerShortSegmentContract) {
+    constexpr std::size_t kShortSegmentSampleCount = 171990;
+    IdentityRunner runner(kShortSegmentSampleCount);
+    StemChunkPipeline pipeline(runner);
+
+    EXPECT_EQ(pipeline.segmentSampleCount(),
+            kShortSegmentSampleCount);
+    EXPECT_EQ(pipeline.strideSampleCount(),
+            static_cast<std::size_t>(
+                    kShortSegmentSampleCount *
+                    (1.0F - StemChunkPipeline::kOverlap)));
+    EXPECT_LT(pipeline.allocatedSampleCapacity(),
+            6879600U);
 }
 
 } // namespace

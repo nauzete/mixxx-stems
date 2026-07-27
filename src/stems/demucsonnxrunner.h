@@ -37,6 +37,7 @@ class DemucsOnnxRunner final : public StemInferenceRunner {
     DemucsOnnxRunner& operator=(DemucsOnnxRunner&&) = delete;
 
     const TensorContract& contract() const noexcept;
+    std::size_t segmentSampleCount() const noexcept override;
 
     /// Runs one normalized stereo HTDemucs segment.
     ///

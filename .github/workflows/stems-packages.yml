@@ -186,10 +186,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
-          & $benchmark `
-            model/htdemucs.onnx 2 build/benchmark-windows-x64.json
-          if ($LASTEXITCODE -ne 0) {
-            exit $LASTEXITCODE
+          foreach ($threads in @(1, 2, 4, 8)) {
+            & $benchmark `
+              model/htdemucs.onnx $threads `
+              "build/benchmark-windows-x64-$threads-threads.json"
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
           }
 
       - name: Install WiX Toolset
@@ -269,7 +272,7 @@ jobs:
             build/Mixxx-Stems-x64.msi.sha256
             build/Mixxx-Stems-x64-portable.zip
             build/Mixxx-Stems-x64-portable.zip.sha256
-            build/benchmark-windows-x64.json
+            build/benchmark-windows-x64-*-threads.json
 
   ubuntu-arm64:
     name: Ubuntu ARM64 DEB
@@ -372,8 +375,11 @@ jobs:
             --dir model
           echo "${HTDEMUCS_SHA256}  model/htdemucs.onnx" | sha256sum --check
           build/onnx-smoke/demucs-onnx-smoke model/htdemucs.onnx
-          build/onnx-smoke/demucs-onnx-benchmark \
-            model/htdemucs.onnx 2 build/benchmark-ubuntu-arm64.json
+          for threads in 1 2 4; do
+            build/onnx-smoke/demucs-onnx-benchmark \
+              model/htdemucs.onnx "${threads}" \
+              "build/benchmark-ubuntu-arm64-${threads}-threads.json"
+          done
 
       - name: Create ARM64 DEB
         run: cpack --config build/CPackConfig.cmake -B build -G DEB -V
@@ -409,7 +415,7 @@ jobs:
           path: |
             build/mixxx-stems_*_arm64.deb
             build/mixxx-stems_*_arm64.deb.sha256
-            build/benchmark-ubuntu-arm64.json
+            build/benchmark-ubuntu-arm64-*-threads.json
 
   release:
     name: Publish tagged release

@@ -204,6 +204,13 @@ bool StemModelManager::validateManifest(
     const auto onnx = root.value(QStringLiteral("onnx")).toObject();
     const auto input = onnx.value(QStringLiteral("input")).toObject();
     const auto output = onnx.value(QStringLiteral("output")).toObject();
+    const auto inputShape =
+            input.value(QStringLiteral("shape")).toArray();
+    const auto segmentSampleCount = inputShape.size() == 3
+            ? inputShape[2].toInteger(-1)
+            : -1;
+    constexpr qint64 kMinimumSegmentSampleCount = 44100;
+    constexpr qint64 kMaximumSegmentSampleCount = 343980;
     if (root.value(QStringLiteral("schema_version")).toInt(-1) != 1 ||
             root.value(QStringLiteral("format_version")).toInt(-1) != 1 ||
             model.value(QStringLiteral("name")).toString() !=
@@ -226,14 +233,16 @@ bool StemModelManager::validateManifest(
                     expectedModelSizeBytes ||
             input.value(QStringLiteral("dtype")).toString() !=
                     QStringLiteral("float32") ||
+            segmentSampleCount < kMinimumSegmentSampleCount ||
+            segmentSampleCount > kMaximumSegmentSampleCount ||
             !integerArrayEquals(
                     input.value(QStringLiteral("shape")),
-                    {1, 2, 343980}) ||
+                    {1, 2, segmentSampleCount}) ||
             output.value(QStringLiteral("dtype")).toString() !=
                     QStringLiteral("float32") ||
             !integerArrayEquals(
                     output.value(QStringLiteral("runtime_shape")),
-                    {1, 4, 2, 343980})) {
+                    {1, 4, 2, segmentSampleCount})) {
         return fail(pErrorMessage,
                 QStringLiteral(
                         "HTDemucs manifest is incompatible"));

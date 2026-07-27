@@ -105,5 +105,37 @@ TEST(StemModelManagerTest, RejectsUnexpectedTensorShape) {
             manifest, kModelSha, kModelSize));
 }
 
+TEST(StemModelManagerTest, AcceptsShortSegmentManifestContract) {
+    auto manifest = validManifest();
+    auto onnx = manifest.value(QStringLiteral("onnx")).toObject();
+    auto input = onnx.value(QStringLiteral("input")).toObject();
+    input.insert(QStringLiteral("shape"), QJsonArray{1, 2, 171990});
+    onnx.insert(QStringLiteral("input"), input);
+    auto output = onnx.value(QStringLiteral("output")).toObject();
+    output.insert(QStringLiteral("runtime_shape"),
+            QJsonArray{1, 4, 2, 171990});
+    onnx.insert(QStringLiteral("output"), output);
+    manifest.insert(QStringLiteral("onnx"), onnx);
+
+    EXPECT_TRUE(StemModelManager::validateManifest(
+            manifest, kModelSha, kModelSize));
+}
+
+TEST(StemModelManagerTest, RejectsTooShortSegmentManifestContract) {
+    auto manifest = validManifest();
+    auto onnx = manifest.value(QStringLiteral("onnx")).toObject();
+    auto input = onnx.value(QStringLiteral("input")).toObject();
+    input.insert(QStringLiteral("shape"), QJsonArray{1, 2, 44099});
+    onnx.insert(QStringLiteral("input"), input);
+    auto output = onnx.value(QStringLiteral("output")).toObject();
+    output.insert(QStringLiteral("runtime_shape"),
+            QJsonArray{1, 4, 2, 44099});
+    onnx.insert(QStringLiteral("output"), output);
+    manifest.insert(QStringLiteral("onnx"), onnx);
+
+    EXPECT_FALSE(StemModelManager::validateManifest(
+            manifest, kModelSha, kModelSize));
+}
+
 } // namespace
 } // namespace mixxx::stems

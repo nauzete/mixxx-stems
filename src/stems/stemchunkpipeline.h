@@ -21,9 +21,8 @@ class StemChunkPipeline final {
     static constexpr float kOverlap = 0.25F;
     static constexpr std::size_t kStrideSampleCount =
             static_cast<std::size_t>(
-                    StemInferenceRunner::kSegmentSampleCount *
+                    StemInferenceRunner::kDefaultSegmentSampleCount *
                     (1.0F - kOverlap));
-    static constexpr std::size_t kStatisticsBlockSampleCount = 65536;
 
     enum class Result {
         Completed,
@@ -52,6 +51,9 @@ class StemChunkPipeline final {
 
     explicit StemChunkPipeline(const StemInferenceRunner& runner);
 
+    std::size_t segmentSampleCount() const noexcept;
+    std::size_t strideSampleCount() const noexcept;
+
     Result run(std::size_t totalFrameCount,
             const ReadCallback& read,
             const WriteCallback& write,
@@ -66,15 +68,9 @@ class StemChunkPipeline final {
         double standardDeviation = 1.0;
     };
 
-    Statistics calculateStatistics(std::size_t totalFrameCount,
-            const ReadCallback& read,
-            const ProgressCallback& progress,
-            const CancelCallback& cancelled,
-            bool* pCancelled);
-    void prepareInput(std::size_t segmentOffset,
+    Statistics prepareInput(std::size_t segmentOffset,
             std::size_t chunkFrameCount,
             std::size_t totalFrameCount,
-            const Statistics& statistics,
             const ReadCallback& read);
     void addSegment(std::span<const float> output,
             std::size_t outputOffset,
@@ -86,6 +82,8 @@ class StemChunkPipeline final {
     void shiftAccumulator();
 
     const StemInferenceRunner& m_runner;
+    const std::size_t m_segmentSampleCount;
+    const std::size_t m_strideSampleCount;
     std::vector<float> m_interleavedInput;
     std::vector<float> m_planarInput;
     std::vector<float> m_accumulator;
