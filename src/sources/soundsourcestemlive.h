@@ -8,9 +8,9 @@
 #include "stems/stemlivesessionregistry.h"
 #include "util/samplebuffer.h"
 
-namespace mixxx {
-
 class SoundSourceProxy;
+
+namespace mixxx {
 
 /// Progressive eight-channel stem source with an original-track fallback.
 ///
@@ -39,7 +39,7 @@ class SoundSourceStemLive final : public SoundSource {
             CSAMPLE* pOutput);
 
     std::shared_ptr<stems::StemLiveSession> m_pLiveSession;
-    std::unique_ptr<SoundSourceProxy> m_pOriginalProxy;
+    std::unique_ptr<::SoundSourceProxy> m_pOriginalProxy;
     AudioSourcePointer m_pOriginalSource;
     audio::ChannelCount m_requestedChannelCount;
     SampleBuffer m_originalBuffer;

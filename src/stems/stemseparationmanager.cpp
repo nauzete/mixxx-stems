@@ -338,6 +338,7 @@ bool StemSeparationManager::loadQueue(QString* pErrorMessage) {
                         .toString(),
                 static_cast<StemSeparationPriority>(priority),
                 maximumRetries,
+                {},
         };
         job.snapshot.state = StemSeparationState::Queued;
         job.snapshot.attemptCount = attemptCount;

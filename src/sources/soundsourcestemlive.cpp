@@ -34,7 +34,7 @@ SoundSource::OpenResult SoundSourceStemLive::tryOpen(
     if (!m_pLiveSession || !m_pLiveSession->track()) {
         return OpenResult::Failed;
     }
-    m_pOriginalProxy = std::make_unique<SoundSourceProxy>(
+    m_pOriginalProxy = std::make_unique<::SoundSourceProxy>(
             m_pLiveSession->track());
     m_pOriginalSource = m_pOriginalProxy->openAudioSource(
             OpenParams(audio::ChannelCount::stereo(),
@@ -66,7 +66,7 @@ void SoundSourceStemLive::close() {
     m_pOriginalSource.reset();
     m_pOriginalProxy.reset();
     m_pLiveSession.reset();
-    m_requestedChannelCount = {};
+    m_requestedChannelCount = audio::ChannelCount();
 }
 
 ReadableSampleFrames
