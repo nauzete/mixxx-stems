@@ -84,6 +84,48 @@ WPushButton[value="1"] {
 }
 
 /* ── WAVEFORM INFO (panel lateral izq) ────────────────────────── */
+#StemActiveModeGroup { padding: 0 2px; }
+#StemActiveModeLabel {
+  color: #777;
+  font-size: 7pt;
+  font-weight: 800;
+  qproperty-alignment: 'AlignHCenter | AlignVCenter';
+}
+#StemActiveModeButton {
+  background-color: #17171c;
+  border: 1px solid #555;
+  color: #ddd;
+  font-size: 8pt;
+  font-weight: 900;
+}
+#StemActiveModeButton[displayValue="1"] {
+  background-color: #382052;
+  border-color: #a86ee0;
+  color: #e4c5ff;
+}
+#StemThreadsGroup { padding: 0 2px; }
+#StemThreadsLabel {
+  color: #777;
+  font-size: 7pt;
+  font-weight: 800;
+  qproperty-alignment: 'AlignHCenter | AlignVCenter';
+}
+#StemThreadsButton {
+  background-color: #17171c;
+  border: 1px solid #555;
+  color: #ddd;
+  font-size: 10pt;
+  font-weight: 900;
+}
+#StemThreadsValue {
+  background-color: #09090d;
+  border: 1px solid #333;
+  color: #eee;
+  font-size: 9pt;
+  font-weight: 900;
+  qproperty-alignment: 'AlignHCenter | AlignVCenter';
+}
+
 #WaveformInfo {
   background-color: #0a0a10;
   border-right: 1px solid #1a1a28;
@@ -118,6 +160,29 @@ WPushButton[value="1"] {
   font-size: 9pt; margin: 2px 3px; padding: 0 1px;
 }
 #WaveformInfo_Loop_Icon { color: #6ee128; font-size: 14pt; }
+#WaveformInfo_StemPads { padding: 2px 1px 0 1px; }
+#StemPadStack { padding: 1px; }
+#StemPadDrums, #StemPadVocal, #StemPadBass, #StemPadOther {
+  background-color: #17171c;
+  border: 1px solid #383840;
+  color: #777;
+  font-size: 7pt;
+  font-weight: 900;
+}
+#StemPadDrums:disabled, #StemPadVocal:disabled,
+#StemPadBass:disabled, #StemPadOther:disabled {
+  background-color: #151519;
+  border-color: #29292f;
+  color: #555;
+}
+#StemPadDrums:enabled { border-color: #278b45; color: #48d273; }
+#StemPadDrums:enabled[displayValue="1"] { background-color: #174d28; color: #8dffad; }
+#StemPadVocal:enabled { border-color: #287ac8; color: #4aa9ff; }
+#StemPadVocal:enabled[displayValue="1"] { background-color: #174873; color: #a7d8ff; }
+#StemPadBass:enabled { border-color: #ad3939; color: #ef5a5a; }
+#StemPadBass:enabled[displayValue="1"] { background-color: #681f25; color: #ffaaaa; }
+#StemPadOther:enabled { border-color: #783eb5; color: #b573ef; }
+#StemPadOther:enabled[displayValue="1"] { background-color: #4a276d; color: #dfb5ff; }
 WBeatSpinBox {
   color: #fff; font-size: 11pt; font-weight: 700;
   background-color: #000;
@@ -133,6 +198,14 @@ WBeatSpinBox::down-arrow, WBeatSpinBox::up-arrow { width:0;height:0;background:#
 #DeckHeader { background-color: #0d1428; padding: 2px 4px; }
 #DeckTitleNote { font-size: 12pt; color: #888; }
 #DeckTitle { font-size: 11pt; font-weight: 700; color: #e8e8e8; }
+#DeckEjectButton {
+  background-color: #151519;
+  border: 1px solid #4b4b55;
+  color: #aaa;
+  font-size: 7pt;
+  font-weight: 800;
+}
+#DeckEjectButton:hover { border-color: #d45a5a; color: #ff8a8a; }
 
 /* Info row */
 #DeckInfo { background-color: #050508; padding: 2px; }

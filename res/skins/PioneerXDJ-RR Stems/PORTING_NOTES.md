@@ -4,17 +4,17 @@ This is a derivative of the supplied PioneerXDJ-RR skin. The original license an
 
 ## Implemented
 
-- Separate `STEMS` tab for 800x480 and larger displays.
-- Four stem rows per deck using current Mixxx stem groups:
+- Four stem pads per deck in a 2x2 layout within the main mixing view:
   - `[ChannelX_Stem1],mute|volume|color`
   - `[ChannelX_Stem2],mute|volume|color`
   - `[ChannelX_Stem3],mute|volume|color`
   - `[ChannelX_Stem4],mute|volume|color`
 - Existing `[ChannelX],stem_count`.
-- Interactive `KnobComposed` volume controls using local SVG assets.
-- Background separation state, percentage, queue, cache, and error controls.
-- Global model download and worker status.
-- Conditional completed-stem and empty-state panels.
+- Independent `[ChannelX_StemN],solo` controls preserve mute state.
+- A global-looking Mute/Solo selector updates both deck mode controls.
+- Pads remain disabled and gray until
+  `[ChannelX],stem_live_ready` reports the first published chunk.
+- Per-deck eject controls use the existing `[ChannelX],eject` API.
 
 ## Control contract
 

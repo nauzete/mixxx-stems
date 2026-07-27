@@ -61,63 +61,64 @@ TEST_F(StemSkinValidationTest, XmlAndLocalResourcesAreValid) {
 }
 
 TEST_F(StemSkinValidationTest,
-        UsesCurrentControlsAndTouchVolumeKnobs) {
+        UsesIntegratedStemPadsAndCurrentControls) {
     const QDir skinDirectory(stemSkinPath(getTestDir()));
     const auto skinXml =
             readFile(skinDirectory.filePath(
                     QStringLiteral("skin.xml")));
-    const auto stemsXml =
+    const auto topbarXml =
             readFile(skinDirectory.filePath(
-                    QStringLiteral("stems.xml")));
+                    QStringLiteral("topbar.xml")));
     const auto deckXml =
             readFile(skinDirectory.filePath(
-                    QStringLiteral("stem_deck.xml")));
-    const auto rowXml =
+                    QStringLiteral("deck.xml")));
+    const auto waveformXml =
             readFile(skinDirectory.filePath(
-                    QStringLiteral("stem_row.xml")));
+                    QStringLiteral("waveform.xml")));
+    const auto padXml =
+            readFile(skinDirectory.filePath(
+                    QStringLiteral("stem_pad.xml")));
     const QString allStemXml =
-            stemsXml + deckXml + rowXml;
+            topbarXml + deckXml + waveformXml + padXml;
 
     EXPECT_TRUE(skinXml.contains(
             QStringLiteral("<MinimumSize>800,480</MinimumSize>")));
     EXPECT_TRUE(skinXml.contains(QStringLiteral(
             "<title>PioneerXDJ-RR Stems</title>")));
-    EXPECT_TRUE(rowXml.contains(
-            QStringLiteral("<KnobComposed>")));
-    EXPECT_TRUE(rowXml.contains(QStringLiteral(
+    EXPECT_FALSE(skinXml.contains(
+            QStringLiteral("Stems_Singleton")));
+    EXPECT_FALSE(topbarXml.contains(
+            QStringLiteral("[Tab],stems")));
+    EXPECT_TRUE(waveformXml.contains(
+            QStringLiteral("WaveformInfo_StemPads")));
+    EXPECT_TRUE(waveformXml.contains(
+            QStringLiteral("StemPadDrums")));
+    EXPECT_TRUE(waveformXml.contains(
+            QStringLiteral("StemPadVocal")));
+    EXPECT_TRUE(waveformXml.contains(
+            QStringLiteral("StemPadBass")));
+    EXPECT_TRUE(waveformXml.contains(
+            QStringLiteral("StemPadOther")));
+    EXPECT_TRUE(padXml.contains(QStringLiteral(
             "_Stem<Variable name=\"stem\"/>],mute")));
-    EXPECT_TRUE(rowXml.contains(QStringLiteral(
-            "_Stem<Variable name=\"stem\"/>],volume")));
-    EXPECT_TRUE(rowXml.contains(QStringLiteral(
-            "_Stem<Variable name=\"stem\"/>],color")));
+    EXPECT_TRUE(padXml.contains(QStringLiteral(
+            "_Stem<Variable name=\"stem\"/>],solo")));
+    EXPECT_TRUE(padXml.contains(
+            QStringLiteral("],stem_live_ready")));
+    EXPECT_TRUE(topbarXml.contains(
+            QStringLiteral(
+                    "[StemSeparation],active_mode")));
+    EXPECT_TRUE(topbarXml.contains(
+            QStringLiteral(
+                    "[StemSeparation],inference_threads")));
+    EXPECT_TRUE(topbarXml.contains(
+            QStringLiteral(
+                    "[StemSeparation],inference_threads_down")));
+    EXPECT_TRUE(topbarXml.contains(
+            QStringLiteral(
+                    "[StemSeparation],inference_threads_up")));
     EXPECT_TRUE(deckXml.contains(
-            QStringLiteral("],stem_count")));
-
-    const QStringList deckControls{
-            QStringLiteral("separation_trigger"),
-            QStringLiteral("separation_cancel"),
-            QStringLiteral("separation_percentage"),
-            QStringLiteral("separation_state"),
-            QStringLiteral("separation_queue_position"),
-            QStringLiteral("stem_cache_status"),
-            QStringLiteral("separation_error"),
-    };
-    for (const auto& control : deckControls) {
-        EXPECT_TRUE(allStemXml.contains(control))
-                << qPrintable(control);
-    }
-    const QStringList globalControls{
-            QStringLiteral("model_available"),
-            QStringLiteral("model_download_progress"),
-            QStringLiteral("queue_size"),
-            QStringLiteral("active_jobs"),
-            QStringLiteral("worker_state"),
-    };
-    for (const auto& control : globalControls) {
-        EXPECT_TRUE(stemsXml.contains(
-                QStringLiteral("[StemSeparation],") + control))
-                << qPrintable(control);
-    }
+            QStringLiteral("],eject")));
     EXPECT_FALSE(allStemXml.contains(
             QStringLiteral("],stem_1_mute")));
     EXPECT_FALSE(allStemXml.contains(
@@ -125,7 +126,7 @@ TEST_F(StemSkinValidationTest,
 }
 
 TEST_F(StemSkinValidationTest,
-        PreservesLicenseAttributionAndCompactRows) {
+        PreservesLicenseAttributionAndCompactLayout) {
     const QDir skinDirectory(stemSkinPath(getTestDir()));
     const auto license =
             readFile(skinDirectory.filePath(
@@ -135,10 +136,10 @@ TEST_F(StemSkinValidationTest,
                     QStringLiteral("README.md")));
     const auto deckXml =
             readFile(skinDirectory.filePath(
-                    QStringLiteral("stem_deck.xml")));
-    const auto rowXml =
+                    QStringLiteral("deck.xml")));
+    const auto waveformXml =
             readFile(skinDirectory.filePath(
-                    QStringLiteral("stem_row.xml")));
+                    QStringLiteral("waveform.xml")));
 
     EXPECT_TRUE(license.contains(
             QStringLiteral("GNU GENERAL PUBLIC LICENSE")));
@@ -147,9 +148,9 @@ TEST_F(StemSkinValidationTest,
     EXPECT_TRUE(readme.contains(
             QStringLiteral("not an official Mixxx release")));
     EXPECT_TRUE(deckXml.contains(
-            QStringLiteral("<Size>110max,34max</Size>")));
-    EXPECT_TRUE(rowXml.contains(
-            QStringLiteral("<Size>38max,38max</Size>")));
+            QStringLiteral("<Size>58max,20max</Size>")));
+    EXPECT_TRUE(waveformXml.contains(
+            QStringLiteral("<Size>0me,58max</Size>")));
 }
 
 } // namespace

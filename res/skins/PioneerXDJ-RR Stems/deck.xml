@@ -19,6 +19,16 @@
             <Channel><Variable name="channel"/></Channel>
             <Elide>right</Elide>
           </TrackProperty>
+          <PushButton>
+            <ObjectName>DeckEjectButton</ObjectName>
+            <TooltipId>eject</TooltipId>
+            <Size>58max,20max</Size>
+            <NumberStates>1</NumberStates>
+            <State><Number>0</Number><Text>EJECT</Text></State>
+            <Connection>
+              <ConfigKey>[Channel<Variable name="channel"/>],eject</ConfigKey>
+            </Connection>
+          </PushButton>
         </Children>
       </WidgetGroup>
 

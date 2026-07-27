@@ -1,5 +1,7 @@
 #include "engine/channels/enginedeck.h"
 
+#include <algorithm>
+
 #include <QStringView>
 
 #include "control/controlpushbutton.h"
@@ -65,9 +67,16 @@ EngineDeck::EngineDeck(
 
     m_pStemCount = std::make_unique<ControlObject>(ConfigKey(getGroup(), "stem_count"));
     m_pStemCount->setReadOnly();
+    m_pStemActiveMode = std::make_unique<ControlPushButton>(
+            ConfigKey(getGroup(), QStringLiteral("stem_active_mode")),
+            true,
+            0.0);
+    m_pStemActiveMode->setButtonMode(
+            mixxx::control::ButtonMode::Toggle);
 
     m_stemGain.reserve(mixxx::kMaxSupportedStems);
     m_stemMute.reserve(mixxx::kMaxSupportedStems);
+    m_stemSolo.reserve(mixxx::kMaxSupportedStems);
     m_stemVuMeter.reserve(mixxx::kMaxSupportedStems);
     for (int stemIdx = 0; stemIdx < mixxx::kMaxSupportedStems; stemIdx++) {
         m_stemGain.emplace_back(std::make_unique<ControlPotmeter>(
@@ -81,6 +90,28 @@ EngineDeck::EngineDeck(
                 ConfigKey(getGroupForStem(getGroup(), stemIdx), QStringLiteral("mute")));
         pMuteButton->setButtonMode(mixxx::control::ButtonMode::PowerWindow);
         m_stemMute.push_back(std::move(pMuteButton));
+
+        auto pSoloButton = std::make_unique<ControlPushButton>(
+                ConfigKey(getGroupForStem(getGroup(), stemIdx),
+                        QStringLiteral("solo")));
+        pSoloButton->setButtonMode(
+                mixxx::control::ButtonMode::Toggle);
+        pSoloButton->connectValueChangeRequest(
+                this,
+                [this, stemIdx](double value) {
+                    for (int otherStemIdx = 0;
+                            otherStemIdx <
+                            static_cast<int>(m_stemSolo.size());
+                            ++otherStemIdx) {
+                        m_stemSolo[otherStemIdx]->setAndConfirm(
+                                value > 0.0 &&
+                                        otherStemIdx == stemIdx
+                                ? 1.0
+                                : 0.0);
+                    }
+                },
+                Qt::DirectConnection);
+        m_stemSolo.push_back(std::move(pSoloButton));
 
         m_stemVuMeter.emplace_back(std::make_unique<EngineVuMeter>(
                 getGroupForStem(getGroup(), stemIdx), QString(), false));
@@ -100,6 +131,7 @@ void EngineDeck::slotTrackLoaded(TrackPointer pNewTrack,
         for (int stemIdx = 0; stemIdx < mixxx::kMaxSupportedStems; stemIdx++) {
             m_stemGain[stemIdx]->set(1.0);
             m_stemMute[stemIdx]->set(0.0);
+            m_stemSolo[stemIdx]->set(0.0);
         }
     }
     m_stemClonedState = false;
@@ -131,6 +163,7 @@ void EngineDeck::processStem(CSAMPLE* pOut, const std::size_t bufferSize) {
     mixxx::audio::ChannelCount chCount = m_pBuffer->getChannelCount();
     VERIFY_OR_DEBUG_ASSERT(m_stems.size() <= chCount &&
             m_stemMute.size() <= chCount && m_stemGain.size() <= chCount &&
+            m_stemSolo.size() <= chCount &&
             m_stemVuMeter.size() <= chCount) {
         return;
     };
@@ -161,10 +194,20 @@ void EngineDeck::processStem(CSAMPLE* pOut, const std::size_t bufferSize) {
     // effect manager so we can also apply the individual stem quick FX
     GroupFeatureState featureState;
     collectFeatures(&featureState);
+    const bool soloMode = m_pStemActiveMode->toBool();
+    const bool hasSolo = soloMode &&
+            std::any_of(m_stemSolo.cbegin(),
+                    m_stemSolo.cbegin() + stemCount,
+                    [](const auto& pSolo) {
+                        return pSolo->toBool();
+                    });
     for (unsigned int stemIdx = 0; stemIdx < stemCount;
             stemIdx++) {
         int chOffset = stemIdx * mixxx::audio::ChannelCount::stereo();
-        float stemGain = m_stemMute[stemIdx]->toBool()
+        const bool silenced = soloMode
+                ? hasSolo && !m_stemSolo[stemIdx]->toBool()
+                : m_stemMute[stemIdx]->toBool();
+        float stemGain = silenced
                 ? 0.0f
                 : static_cast<float>(m_stemGain[stemIdx]->get());
         // Extract the stem frames into the output buffer (LR......LR...... -> LRLR)
@@ -214,14 +257,21 @@ void EngineDeck::cloneStemState(const EngineDeck* deckToClone) {
     }
     VERIFY_OR_DEBUG_ASSERT(m_stemGain.size() == mixxx::kMaxSupportedStems &&
             m_stemMute.size() == mixxx::kMaxSupportedStems &&
+            m_stemSolo.size() == mixxx::kMaxSupportedStems &&
             deckToClone->m_stemGain.size() == mixxx::kMaxSupportedStems &&
-            deckToClone->m_stemMute.size() == mixxx::kMaxSupportedStems) {
+            deckToClone->m_stemMute.size() == mixxx::kMaxSupportedStems &&
+            deckToClone->m_stemSolo.size() ==
+                    mixxx::kMaxSupportedStems) {
         return;
     }
     for (int stemIdx = 0; stemIdx < mixxx::kMaxSupportedStems; stemIdx++) {
         m_stemGain[stemIdx]->set(deckToClone->m_stemGain[stemIdx]->get());
         m_stemMute[stemIdx]->set(deckToClone->m_stemMute[stemIdx]->get());
+        m_stemSolo[stemIdx]->set(
+                deckToClone->m_stemSolo[stemIdx]->get());
     }
+    m_pStemActiveMode->set(
+            deckToClone->m_pStemActiveMode->get());
     m_stemClonedState = true;
 }
 #endif

@@ -73,6 +73,17 @@ class StemControlFixture : public BaseSignalPathTest,
         m_pStem2Mute = std::make_unique<PollingControlProxy>(getGroupForStem(m_sGroup1, 2), "mute");
         m_pStem3Mute = std::make_unique<PollingControlProxy>(getGroupForStem(m_sGroup1, 3), "mute");
         m_pStem4Mute = std::make_unique<PollingControlProxy>(getGroupForStem(m_sGroup1, 4), "mute");
+        m_pStemActiveMode =
+                std::make_unique<PollingControlProxy>(
+                        m_sGroup1, "stem_active_mode");
+        m_pStem1Solo = std::make_unique<PollingControlProxy>(
+                getGroupForStem(m_sGroup1, 1), "solo");
+        m_pStem2Solo = std::make_unique<PollingControlProxy>(
+                getGroupForStem(m_sGroup1, 2), "solo");
+        m_pStem3Solo = std::make_unique<PollingControlProxy>(
+                getGroupForStem(m_sGroup1, 3), "solo");
+        m_pStem4Solo = std::make_unique<PollingControlProxy>(
+                getGroupForStem(m_sGroup1, 4), "solo");
         m_pStem1Color = std::make_unique<PollingControlProxy>(
                 getGroupForStem(m_sGroup1, 1), "color");
         m_pStem2Color = std::make_unique<PollingControlProxy>(
@@ -152,6 +163,11 @@ class StemControlFixture : public BaseSignalPathTest,
     std::unique_ptr<PollingControlProxy> m_pStem2Mute;
     std::unique_ptr<PollingControlProxy> m_pStem3Mute;
     std::unique_ptr<PollingControlProxy> m_pStem4Mute;
+    std::unique_ptr<PollingControlProxy> m_pStemActiveMode;
+    std::unique_ptr<PollingControlProxy> m_pStem1Solo;
+    std::unique_ptr<PollingControlProxy> m_pStem2Solo;
+    std::unique_ptr<PollingControlProxy> m_pStem3Solo;
+    std::unique_ptr<PollingControlProxy> m_pStem4Solo;
     std::unique_ptr<PollingControlProxy> m_pStem1Color;
     std::unique_ptr<PollingControlProxy> m_pStem2Color;
     std::unique_ptr<PollingControlProxy> m_pStem3Color;
@@ -340,6 +356,35 @@ TEST_P(StemControlFixture, Mute) {
     m_pEngineMixer->process(kProcessBufferSize);
     assertBufferMatchesReference(m_pEngineMixer->getMainBuffer(),
             QStringLiteral("StemMuteControlFull"));
+}
+
+TEST_P(StemControlFixture, SoloIsExclusiveAndDoesNotOverwriteMute) {
+    m_pChannel1->getEngineBuffer()->queueNewPlaypos(
+            mixxx::audio::FramePos{0}, EngineBuffer::SEEK_STANDARD);
+    m_pPlay->set(1.0);
+    m_pStem1Mute->set(1.0);
+    m_pStemActiveMode->set(1.0);
+    m_pStem1Solo->set(1.0);
+
+    EXPECT_EQ(m_pStem1Solo->get(), 1.0);
+    EXPECT_EQ(m_pStem2Solo->get(), 0.0);
+    EXPECT_EQ(m_pStem3Solo->get(), 0.0);
+    EXPECT_EQ(m_pStem4Solo->get(), 0.0);
+
+    // Solo mode deliberately ignores the saved mute state.
+    m_pEngineMixer->process(kProcessBufferSize);
+    m_pEngineMixer->process(kProcessBufferSize);
+    assertBufferMatchesReference(m_pEngineMixer->getMainBuffer(),
+            QStringLiteral("StemVolumeControlDrumOnly"));
+
+    m_pStem2Solo->set(1.0);
+    EXPECT_EQ(m_pStem1Solo->get(), 0.0);
+    EXPECT_EQ(m_pStem2Solo->get(), 1.0);
+    EXPECT_EQ(m_pStem1Mute->get(), 1.0);
+
+    // Returning to MUTE mode restores the independent mute selection.
+    m_pStemActiveMode->set(0.0);
+    EXPECT_EQ(m_pStem1Mute->get(), 1.0);
 }
 
 TEST_P(StemControlFixture, VuMeter) {

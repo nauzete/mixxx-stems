@@ -107,6 +107,50 @@
             </Children>
           </WidgetGroup>
 
+          <WidgetGroup>
+            <ObjectName>WaveformInfo_StemPads</ObjectName>
+            <Layout>vertical</Layout>
+            <Size>0me,58max</Size>
+            <Children>
+              <WidgetGroup>
+                <Layout>horizontal</Layout>
+                <Size>0me,27max</Size>
+                <Children>
+                  <Template src="skin:stem_pad.xml">
+                    <SetVariable name="channel"><Variable name="channel"/></SetVariable>
+                    <SetVariable name="stem">1</SetVariable>
+                    <SetVariable name="label">DRUMS</SetVariable>
+                    <SetVariable name="objectName">StemPadDrums</SetVariable>
+                  </Template>
+                  <Template src="skin:stem_pad.xml">
+                    <SetVariable name="channel"><Variable name="channel"/></SetVariable>
+                    <SetVariable name="stem">4</SetVariable>
+                    <SetVariable name="label">VOCAL</SetVariable>
+                    <SetVariable name="objectName">StemPadVocal</SetVariable>
+                  </Template>
+                </Children>
+              </WidgetGroup>
+              <WidgetGroup>
+                <Layout>horizontal</Layout>
+                <Size>0me,27max</Size>
+                <Children>
+                  <Template src="skin:stem_pad.xml">
+                    <SetVariable name="channel"><Variable name="channel"/></SetVariable>
+                    <SetVariable name="stem">2</SetVariable>
+                    <SetVariable name="label">BASS</SetVariable>
+                    <SetVariable name="objectName">StemPadBass</SetVariable>
+                  </Template>
+                  <Template src="skin:stem_pad.xml">
+                    <SetVariable name="channel"><Variable name="channel"/></SetVariable>
+                    <SetVariable name="stem">3</SetVariable>
+                    <SetVariable name="label">OTHER</SetVariable>
+                    <SetVariable name="objectName">StemPadOther</SetVariable>
+                  </Template>
+                </Children>
+              </WidgetGroup>
+            </Children>
+          </WidgetGroup>
+
         </Children>
       </WidgetGroup>
 
