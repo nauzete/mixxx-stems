@@ -17,6 +17,7 @@
 
 class BaseTrackPlayer;
 class ControlObject;
+class ControlPotmeter;
 class ControlPushButton;
 
 namespace mixxx::stems {
@@ -70,6 +71,12 @@ class StemStatusControlProvider final : public QObject {
         QString sourceFilePath;
         QString jobId;
         QString cacheEntryId;
+        QString liveSessionId;
+        QString previousSourceFilePath;
+        QString previousCacheEntryId;
+        QString previousLiveSessionId;
+        StemSeparationPriority requestedPriority =
+                StemSeparationPriority::LoadedNotPlaying;
         quint64 fingerprintGeneration = 0;
         std::shared_ptr<std::atomic_bool>
                 pFingerprintCancellation;
@@ -80,12 +87,15 @@ class StemStatusControlProvider final : public QObject {
         std::unique_ptr<ControlObject> pState;
         std::unique_ptr<ControlObject> pQueuePosition;
         std::unique_ptr<ControlObject> pCacheStatus;
+        std::unique_ptr<ControlObject> pLiveReady;
         std::unique_ptr<ControlObject> pError;
     };
 
     std::shared_ptr<DeckState> deckState(
             const QString& group) const;
-    void trigger(const QString& group);
+    void trigger(const QString& group,
+            StemSeparationPriority priority =
+                    StemSeparationPriority::Manual);
     void cancel(const QString& group);
     void beginFingerprint(
             const std::shared_ptr<DeckState>& pDeckState);
@@ -95,10 +105,17 @@ class StemStatusControlProvider final : public QObject {
             QString displayName,
             std::optional<StemCacheKey> key,
             QString error);
+    void enqueueRequest(
+            const std::shared_ptr<DeckState>& pDeckState,
+            QString sourceFilePath,
+            QString cacheEntryId,
+            QString displayName,
+            QString* pErrorMessage = nullptr);
     QUrl resolveForDeck(
             const QString& group, const TrackPointer& pTrack);
     void trackLoading(const QString& group,
-            const TrackPointer& pNewTrack);
+            const TrackPointer& pNewTrack,
+            const TrackPointer& pOldTrack);
     void modelAvailabilityChanged(bool available);
     void jobChanged(const QString& jobId);
     void queueChanged(int queueSize, int activeJobs);
@@ -132,6 +149,8 @@ class StemStatusControlProvider final : public QObject {
     std::unique_ptr<ControlObject> m_pWorkerState;
     std::unique_ptr<ControlObject> m_pModelAvailable;
     std::unique_ptr<ControlObject> m_pModelDownloadProgress;
+    std::unique_ptr<ControlPushButton> m_pActiveMode;
+    std::unique_ptr<ControlPotmeter> m_pInferenceThreads;
     bool m_initialized = false;
     bool m_shuttingDown = false;
 };

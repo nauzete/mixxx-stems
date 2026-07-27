@@ -12,6 +12,8 @@
 #include "stems/stemaudiosourcereader.h"
 #include "stems/stemchunkpipeline.h"
 #include "stems/stemcontainerwriter.h"
+#include "stems/stemlivesessionregistry.h"
+#include "stems/stemtemporarystore.h"
 #include "track/track.h"
 
 namespace mixxx::stems {
@@ -50,6 +52,37 @@ DemucsStemSeparationProcessor::DemucsStemSeparationProcessor(
 
 DemucsStemSeparationProcessor::~DemucsStemSeparationProcessor() = default;
 
+void DemucsStemSeparationProcessor::setInferenceThreadCount(
+        int threadCount) {
+    if (threadCount < 1 ||
+            m_settings.inferenceThreadCount == threadCount) {
+        return;
+    }
+    m_settings.inferenceThreadCount = threadCount;
+    m_pRunner.reset();
+}
+
+void DemucsStemSeparationProcessor::discardCached(
+        const QString& entryId) {
+    const auto protectedIds = protectedEntryIds({});
+    if (entryId.isEmpty() ||
+            protectedIds.contains(entryId)) {
+        return;
+    }
+    QString error;
+    if (!m_cacheInitialized) {
+        if (!m_cache.initialize(&error) ||
+                !m_alternateSourceLinker.initialize(&error)) {
+            return;
+        }
+        m_cacheInitialized = true;
+    }
+    if (m_cache.remove(entryId, protectedIds, &error)) {
+        m_alternateSourceLinker.removeEntry(entryId, nullptr);
+    }
+    QFile::remove(m_cache.partialFilePath(entryId));
+}
+
 StemSeparationProcessor::Result
 DemucsStemSeparationProcessor::process(
         const StemSeparationRequest& request,
@@ -76,6 +109,10 @@ DemucsStemSeparationProcessor::process(
                 Outcome::PermanentFailure,
                 std::move(error),
         };
+    }
+
+    if (!request.liveSessionId.isEmpty()) {
+        return processLive(request, callbacks);
     }
 
     error.clear();
@@ -206,6 +243,90 @@ DemucsStemSeparationProcessor::process(
                 Outcome::PermanentFailure,
                 QStringLiteral("Stem pipeline failed: %1")
                         .arg(QString::fromUtf8(exception.what())),
+        };
+    }
+}
+
+StemSeparationProcessor::Result
+DemucsStemSeparationProcessor::processLive(
+        const StemSeparationRequest& request,
+        const Callbacks& callbacks) {
+    const auto pLiveSession =
+            StemLiveSessionRegistry::find(
+                    request.liveSessionId);
+    if (!pLiveSession) {
+        return {Outcome::Cancelled, {}};
+    }
+    QString error;
+    try {
+        const auto pTrack =
+                Track::newTemporary(request.sourceFilePath);
+        auto pReader = StemAudioSourceReader::open(pTrack);
+        StemTemporaryStore store(
+                pLiveSession->temporaryDirectoryPath());
+        if (!store.initialize(request.liveSessionId,
+                    pReader->frameCount(),
+                    &error)) {
+            return {
+                    Outcome::PermanentFailure,
+                    std::move(error),
+            };
+        }
+        pLiveSession->publishTemporarySession(
+                store.session());
+        StemChunkPipeline pipeline(*m_pRunner);
+        if (callbacks.publishState) {
+            callbacks.publishState(
+                    StemSeparationState::Separating);
+        }
+        const auto result = pipeline.run(
+                pReader->frameCount(),
+                [&](std::size_t frameOffset,
+                        std::span<float> interleavedStereo) {
+                    pReader->read(
+                            frameOffset, interleavedStereo);
+                },
+                [&](std::size_t frameOffset,
+                        std::size_t frameCount,
+                        std::span<const float> planarStems) {
+                    if (!store.append(frameOffset,
+                                frameCount,
+                                planarStems,
+                                &error)) {
+                        throw std::runtime_error(
+                                error.toStdString());
+                    }
+                    if (callbacks.publishAvailableFrames) {
+                        callbacks.publishAvailableFrames(
+                                frameOffset + frameCount,
+                                pReader->frameCount());
+                    }
+                },
+                callbacks.publishProgress,
+                [&] { return stopped(callbacks); });
+        if (result == StemChunkPipeline::Result::Cancelled ||
+                stopped(callbacks)) {
+            store.remove();
+            return cancelledOrPaused(callbacks);
+        }
+        if (!store.finish(&error)) {
+            store.remove();
+            return {
+                    Outcome::RetryableFailure,
+                    std::move(error),
+            };
+        }
+        return {Outcome::Completed, {}};
+    } catch (const std::exception& exception) {
+        if (stopped(callbacks)) {
+            return cancelledOrPaused(callbacks);
+        }
+        return {
+                Outcome::PermanentFailure,
+                QStringLiteral(
+                        "Live stem pipeline failed: %1")
+                        .arg(QString::fromUtf8(
+                                exception.what())),
         };
     }
 }

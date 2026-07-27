@@ -360,6 +360,15 @@ class Track : public QObject {
         // lock thread-unsafe copy constructors of QList
         return !m_stemInfo.isEmpty();
     }
+
+    /// Installs transient stem labels/colors for a generated alternate source.
+    ///
+    /// This does not mark library metadata dirty and must be paired with
+    /// clearStemInfosForTemporarySource() when the last live source is
+    /// released.
+    bool setStemInfosForTemporarySource(
+            QList<StemInfo> stemInfos);
+    void clearStemInfosForTemporarySource();
 #endif
 
     enum class ImportStatus {

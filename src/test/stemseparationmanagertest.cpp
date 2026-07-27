@@ -41,6 +41,16 @@ StemSeparationRequest request(
 
 class RecordingProcessor final : public StemSeparationProcessor {
   public:
+    void setInferenceThreadCount(int threadCount) override {
+        m_inferenceThreadCount.store(
+                threadCount, std::memory_order_release);
+    }
+
+    void discardCached(const QString& entryId) override {
+        QMutexLocker lock(&m_mutex);
+        m_discarded.push_back(entryId);
+    }
+
     Result process(const StemSeparationRequest& request,
             const Callbacks& callbacks) override {
         callbacks.publishState(StemSeparationState::Separating);
@@ -59,9 +69,17 @@ class RecordingProcessor final : public StemSeparationProcessor {
         return m_processed;
     }
 
+    QList<QString> discarded() const {
+        QMutexLocker lock(&m_mutex);
+        return m_discarded;
+    }
+
+    std::atomic_int m_inferenceThreadCount{0};
+
   private:
     mutable QMutex m_mutex;
     QList<QString> m_processed;
+    QList<QString> m_discarded;
 };
 
 class CancellableProcessor final : public StemSeparationProcessor {
@@ -109,6 +127,42 @@ class FailingProcessor final : public StemSeparationProcessor {
         };
     }
 };
+
+TEST(StemSeparationManagerTest, DiscardsCacheOnWorker) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    auto processor = std::make_shared<RecordingProcessor>();
+    StemSeparationManager manager(
+            directory.filePath(QStringLiteral("queue.json")),
+            processor);
+    QString error;
+    ASSERT_TRUE(manager.initialize(&error)) << error.toStdString();
+
+    manager.discardCached(QStringLiteral("entry"));
+
+    ASSERT_TRUE(waitUntil([&] {
+        return processor->discarded() ==
+                QList<QString>{QStringLiteral("entry")};
+    }));
+}
+
+TEST(StemSeparationManagerTest, UpdatesInferenceThreadsOnWorker) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    auto processor = std::make_shared<RecordingProcessor>();
+    StemSeparationManager manager(
+            directory.filePath(QStringLiteral("queue.json")),
+            processor);
+    QString error;
+    ASSERT_TRUE(manager.initialize(&error)) << error.toStdString();
+
+    manager.setInferenceThreadCount(3);
+
+    ASSERT_TRUE(waitUntil([&] {
+        return processor->m_inferenceThreadCount.load(
+                       std::memory_order_acquire) == 3;
+    }));
+}
 
 TEST(StemSeparationManagerTest, RunsPriorityThenFifoOnOneWorker) {
     QTemporaryDir directory;

@@ -209,6 +209,33 @@ void StemSeparationManager::setPaused(bool paused) {
     startNext();
 }
 
+void StemSeparationManager::setInferenceThreadCount(
+        int threadCount) {
+    if (!m_initialized || m_shuttingDown ||
+            threadCount < 1) {
+        return;
+    }
+    const auto pProcessor = m_pProcessor;
+    m_workerPool.start(QRunnable::create(
+            [pProcessor, threadCount] {
+                pProcessor->setInferenceThreadCount(
+                        threadCount);
+            }));
+}
+
+void StemSeparationManager::discardCached(
+        const QString& entryId) {
+    if (!m_initialized || m_shuttingDown ||
+            entryId.isEmpty()) {
+        return;
+    }
+    const auto pProcessor = m_pProcessor;
+    m_workerPool.start(QRunnable::create(
+            [pProcessor, entryId] {
+                pProcessor->discardCached(entryId);
+            }));
+}
+
 bool StemSeparationManager::isPaused() const noexcept {
     return m_paused;
 }
@@ -334,7 +361,8 @@ bool StemSeparationManager::saveQueue(
     }
     QJsonArray jobs;
     for (auto job = m_jobs.cbegin(); job != m_jobs.cend(); ++job) {
-        if (isTerminal(job->snapshot.state)) {
+        if (isTerminal(job->snapshot.state) ||
+                !job->snapshot.request.liveSessionId.isEmpty()) {
             continue;
         }
         jobs.append(QJsonObject{
@@ -446,6 +474,18 @@ void StemSeparationManager::runJob(const QString& jobId,
                 return pCancellation->pauseRequested.load(
                         std::memory_order_acquire);
             },
+            [this, jobId](std::size_t readyFrameCount,
+                    std::size_t totalFrameCount) {
+                QMetaObject::invokeMethod(this,
+                        [this,
+                                jobId,
+                                readyFrameCount,
+                                totalFrameCount] {
+                            publishAvailableFrames(jobId,
+                                    readyFrameCount,
+                                    totalFrameCount);
+                        });
+            },
     };
     StemSeparationProcessor::Result result;
     try {
@@ -506,6 +546,19 @@ void StemSeparationManager::publishProgress(
     }
     job->snapshot.percentage = percentage;
     emit jobChanged(jobId);
+}
+
+void StemSeparationManager::publishAvailableFrames(
+        const QString& jobId,
+        std::size_t readyFrameCount,
+        std::size_t totalFrameCount) {
+    if (m_shuttingDown || readyFrameCount == 0 ||
+            readyFrameCount > totalFrameCount) {
+        return;
+    }
+    emit jobFramesAvailable(jobId,
+            static_cast<qulonglong>(readyFrameCount),
+            static_cast<qulonglong>(totalFrameCount));
 }
 
 void StemSeparationManager::workerFinished(const QString& jobId,

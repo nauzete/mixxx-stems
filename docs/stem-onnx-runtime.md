@@ -25,17 +25,36 @@ configuration error.
 `mixxx::stems::DemucsOnnxRunner` validates the published HTDemucs tensor
 contract while constructing its session:
 
-- input name and shape: `input`, `[1, 2, 343980]`;
-- output name and runtime shape: `output`, `[1, 4, 2, 343980]`;
+- input name and shape: `input`, `[1, 2, segment]`;
+- output name and runtime shape: `output`, `[1, 4, 2, segment]`;
+- accepted fixed segment range: 44,100 through 343,980 frames;
 - element type: 32-bit float;
 - logical source order: drums, bass, other, vocals;
 - execution provider: CPU;
 - execution mode: sequential;
 - one inter-op thread and a configurable positive intra-op thread count.
 
+ARM64 disables ONNX Runtime's CPU memory arena. Measurements of the fixed
+2.6-second model on Windows showed the same option reducing the isolated
+inference-process peak from about 1.75 GB to 1.07 GB, with a latency tradeoff.
+Windows keeps the arena enabled for lower time-to-first-chunk. These figures
+are diagnostic comparisons, not Raspberry Pi measurements.
+
+A MatMul/Gemm-only dynamic INT8 experiment reduced the 2.6-second model file
+from about 304 MB to 220 MB and preserved the synthetic parity output, but on
+Windows it was slower and saved only about 0.10 GB with the arena disabled.
+It is therefore not selected as the default model. Full dynamic INT8 is also
+rejected because the CPU execution provider cannot run the resulting
+`ConvInteger` graph.
+
 Construction and inference allocate memory and block. The class is restricted
 to a background worker and must never be invoked by the real-time audio
 thread.
+
+`StemSeparationManager` owns a single serialized processor and that processor
+owns one `DemucsOnnxRunner` session. Both decks therefore share one loaded
+model; loading the same track in a second deck reuses the same live session
+and job instead of loading another model or starting parallel inference.
 
 ## Smoke validation
 

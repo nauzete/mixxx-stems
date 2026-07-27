@@ -619,6 +619,12 @@ void BaseTrackPlayerImpl::setAlternateAudioSourceResolver(
     m_alternateAudioSourceResolver = resolver;
 }
 
+void BaseTrackPlayerImpl::publishStemFramesAvailable(
+        SINT readyFrameCount) {
+    m_pChannel->getEngineBuffer()
+            ->publishStemFramesAvailable(readyFrameCount);
+}
+
 void BaseTrackPlayerImpl::slotLoadTrack(TrackPointer pNewTrack,
         mixxx::StemChannelSelection stemMask,
         bool bPlay) {

@@ -2788,6 +2788,8 @@ target_sources(
     src/stems/stemcache.h
     src/stems/stemchunkpipeline.cpp
     src/stems/stemchunkpipeline.h
+    src/stems/stemtemporarystore.cpp
+    src/stems/stemtemporarystore.h
     src/stems/steminferencerunner.h
     src/stems/stemmodelmanager.cpp
     src/stems/stemmodelmanager.h
@@ -2931,6 +2933,10 @@ if(STEM)
     mixxx-lib
     PRIVATE
       src/sources/soundsourcestem.cpp
+      src/sources/soundsourcestemlive.cpp
+      src/sources/soundsourcestemlive.h
+      src/stems/stemlivesessionregistry.cpp
+      src/stems/stemlivesessionregistry.h
       src/stems/stemcontainerwriter.cpp
       src/stems/stemcontainerwriter.h
       src/track/steminfoimporter.cpp
@@ -3058,6 +3064,7 @@ if(BUILD_TESTING)
     src/test/stemcachetest.cpp
     src/test/stemalternatesourcelinkertest.cpp
     src/test/stemchunkpipelinetest.cpp
+    src/test/stemtemporarystoretest.cpp
     src/test/stemmodelmanagertest.cpp
     src/test/stemseparationmanagertest.cpp
     src/test/soundproxy_test.cpp
@@ -3089,6 +3096,7 @@ if(BUILD_TESTING)
       src/test/steminfotest.cpp
       src/test/stemcontrolobjecttest.cpp
       src/test/stemcontainerwritertest.cpp
+      src/test/soundsourcestemlivetest.cpp
       src/test/stemskinvalidationtest.cpp
     )
     if(ONNXRUNTIME)

@@ -39,6 +39,7 @@ struct StemSeparationRequest final {
     QString displayName;
     StemSeparationPriority priority = StemSeparationPriority::Manual;
     int maximumRetries = 2;
+    QString liveSessionId;
 };
 
 struct StemSeparationSnapshot final {
@@ -71,9 +72,15 @@ class StemSeparationProcessor {
         std::function<void(float)> publishProgress;
         std::function<bool()> cancelled;
         std::function<bool()> pauseRequested;
+        std::function<void(std::size_t, std::size_t)>
+                publishAvailableFrames;
     };
 
     virtual ~StemSeparationProcessor() = default;
+    virtual void setInferenceThreadCount(int) {
+    }
+    virtual void discardCached(const QString&) {
+    }
     virtual Result process(const StemSeparationRequest& request,
             const Callbacks& callbacks) = 0;
 };
@@ -99,6 +106,8 @@ class StemSeparationManager final : public QObject {
     bool setPriority(
             const QString& jobId, StemSeparationPriority priority);
     void setPaused(bool paused);
+    void setInferenceThreadCount(int threadCount);
+    void discardCached(const QString& entryId);
 
     bool isPaused() const noexcept;
     int queueSize() const noexcept;
@@ -111,6 +120,9 @@ class StemSeparationManager final : public QObject {
     void jobChanged(const QString& jobId);
     void queueChanged(int queueSize, int activeJobs);
     void workerPausedChanged(bool paused);
+    void jobFramesAvailable(const QString& jobId,
+            qulonglong readyFrameCount,
+            qulonglong totalFrameCount);
 
   private:
     struct Cancellation final {
@@ -134,6 +146,9 @@ class StemSeparationManager final : public QObject {
     void publishState(
             const QString& jobId, StemSeparationState state);
     void publishProgress(const QString& jobId, float progress);
+    void publishAvailableFrames(const QString& jobId,
+            std::size_t readyFrameCount,
+            std::size_t totalFrameCount);
     void workerFinished(const QString& jobId,
             StemSeparationProcessor::Result result);
     void notifyJobAndQueue(const QString& jobId);

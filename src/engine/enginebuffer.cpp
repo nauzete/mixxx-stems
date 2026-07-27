@@ -1608,6 +1608,13 @@ void EngineBuffer::loadTrack(TrackPointer pTrack,
     }
 }
 
+#ifdef __STEM__
+void EngineBuffer::publishStemFramesAvailable(
+        SINT readyFrameCount) {
+    m_pReader->publishStemFramesAvailable(readyFrameCount);
+}
+#endif
+
 void EngineBuffer::addControl(EngineControl* pControl) {
     // Connect to signals from EngineControl here...
     m_engineControls.push_back(pControl);

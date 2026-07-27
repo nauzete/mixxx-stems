@@ -1,9 +1,10 @@
 # Stem benchmarks and physical validation
 
-The packaging workflow runs one deterministic HTDemucs segment on Windows x64
-and on a native Ubuntu ARM64 runner. It records elapsed inference time, audio
-duration, real-time factor (RTF), peak process RSS, thread count, architecture,
-and ONNX Runtime version as JSON.
+The packaging workflow runs one deterministic HTDemucs segment with 1, 2, 4,
+and 8 threads on Windows x64, and with 1, 2, and 4 threads on a native Ubuntu
+ARM64 runner. Each run records elapsed inference time, audio duration,
+real-time factor (RTF), peak process RSS, thread count, architecture, and ONNX
+Runtime version as JSON.
 
 `RTF = processing seconds / audio seconds`. The engineering target is below
 `1.0`, with `0.75` or lower preferred. A GitHub ARM64 runner demonstrates build
@@ -21,8 +22,9 @@ tools/stems/run-stem-benchmark.sh \
 ```
 
 The benchmark uses synthetic stereo tones, not copyrighted audio. It performs
-model loading outside the timed interval and times one exact `[1, 2, 343980]`
-CPU inference. Peak RSS covers the complete benchmark process.
+model loading outside the timed interval and times one exact
+`[1, 2, segment]` CPU inference using the fixed segment declared by the model.
+Peak RSS covers the complete benchmark process.
 
 ## Two-hour local telemetry
 

@@ -228,6 +228,8 @@ class EngineBuffer : public EngineObject {
             EngineChannel* pChannelToCloneFrom,
             QUrl alternateAudioUrl = {});
 
+    void publishStemFramesAvailable(SINT readyFrameCount);
+
     mixxx::StemChannelSelection getStemMask() const {
         return m_stemMask;
     }

@@ -40,9 +40,13 @@ class DemucsStemSeparationProcessor final
 
     Result process(const StemSeparationRequest& request,
             const Callbacks& callbacks) override;
+    void setInferenceThreadCount(int threadCount) override;
+    void discardCached(const QString& entryId) override;
 
   private:
     Result cancelledOrPaused(const Callbacks& callbacks) const;
+    Result processLive(const StemSeparationRequest& request,
+            const Callbacks& callbacks);
     bool prepareRuntime(
             const Callbacks& callbacks, QString* pErrorMessage);
     QSet<QString> protectedEntryIds(

@@ -7,14 +7,17 @@
 #include <QRunnable>
 #include <QThread>
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 #include "control/controlobject.h"
+#include "control/controlpotmeter.h"
 #include "control/controlpushbutton.h"
 #include "mixer/basetrackplayer.h"
 #include "moc_stemstatuscontrolprovider.cpp"
 #include "stems/demucsstemseparationprocessor.h"
 #include "stems/stemalternatesourcelinker.h"
+#include "stems/stemlivesessionregistry.h"
 #include "stems/stemmodelmanager.h"
 #include "track/track.h"
 
@@ -25,6 +28,7 @@ const QString kGlobalGroup =
         QStringLiteral("[StemSeparation]");
 const QString kModelDirectoryName = QStringLiteral("model");
 const QString kCacheDirectoryName = QStringLiteral("cache");
+const QString kLiveDirectoryName = QStringLiteral("live");
 const QString kQueueFileName = QStringLiteral("queue.json");
 
 std::unique_ptr<ControlObject> readOnlyControl(
@@ -71,17 +75,82 @@ StemStatusControlProvider::StemStatusControlProvider(
             kGlobalGroup, QStringLiteral("model_available"));
     m_pModelDownloadProgress = readOnlyControl(kGlobalGroup,
             QStringLiteral("model_download_progress"));
+    m_pActiveMode = std::make_unique<ControlPushButton>(
+            ConfigKey(kGlobalGroup,
+                    QStringLiteral("active_mode")),
+            true,
+            0.0);
+    m_pActiveMode->setButtonMode(
+            mixxx::control::ButtonMode::Toggle);
+#if defined(Q_OS_WIN)
+    constexpr int kPlatformThreadLimit = 8;
+#else
+    constexpr int kPlatformThreadLimit = 4;
+#endif
+    const auto maximumThreadCount = std::clamp(
+            QThread::idealThreadCount(),
+            1,
+            kPlatformThreadLimit);
+    m_pInferenceThreads =
+            std::make_unique<ControlPotmeter>(
+                    ConfigKey(kGlobalGroup,
+                            QStringLiteral(
+                                    "inference_threads")),
+                    1.0,
+                    static_cast<double>(maximumThreadCount),
+                    false,
+                    true,
+                    false,
+                    true,
+                    static_cast<double>(std::clamp(
+                            m_settings.inferenceThreadCount,
+                            1,
+                            maximumThreadCount)));
+    m_pInferenceThreads->setStepCount(
+            std::max(1, maximumThreadCount - 1));
 
     connect(m_pEnabled.get(),
             &ControlObject::valueChanged,
             this,
             &StemStatusControlProvider::enabledChanged);
+    connect(m_pActiveMode.get(),
+            &ControlObject::valueChanged,
+            this,
+            [this](double value) {
+                for (const auto& pDeckState : m_decks) {
+                    const ConfigKey key(
+                            pDeckState->pDeck->getGroup(),
+                            QStringLiteral("stem_active_mode"));
+                    if (ControlObject::exists(key)) {
+                        ControlObject::set(key, value);
+                    }
+                }
+            });
+    connect(m_pInferenceThreads.get(),
+            &ControlObject::valueChanged,
+            this,
+            [this](double value) {
+                if (m_pManager) {
+                    m_pManager->setInferenceThreadCount(
+                            std::max(1,
+                                    static_cast<int>(
+                                            std::lround(value))));
+                }
+            });
 }
 
 StemStatusControlProvider::~StemStatusControlProvider() {
     m_shuttingDown = true;
     m_fingerprintPool.clear();
     m_fingerprintPool.waitForDone();
+    for (const auto& pDeckState : m_decks) {
+        if (!pDeckState->liveSessionId.isEmpty()) {
+            StemLiveSessionRegistry::release(
+                    pDeckState->liveSessionId,
+                    pDeckState->pDeck->getLoadedTrack());
+            pDeckState->liveSessionId.clear();
+        }
+    }
     m_pManager.reset();
 }
 
@@ -101,6 +170,17 @@ bool StemStatusControlProvider::initialize(
         return false;
     }
     const QDir root(m_settings.rootDirectoryPath);
+    const QDir liveDirectory(
+            root.filePath(kLiveDirectoryName));
+    if (!QDir().mkpath(liveDirectory.path())) {
+        if (pErrorMessage) {
+            *pErrorMessage = QStringLiteral(
+                    "Failed to create temporary stem directory");
+        }
+        return false;
+    }
+    StemLiveSessionRegistry::removeStaleFiles(
+            liveDirectory.path());
     const auto cachePath =
             root.filePath(kCacheDirectoryName);
     m_pAlternateSourceLinker =
@@ -155,7 +235,11 @@ bool StemStatusControlProvider::initialize(
                                 modelSha,
                                 cachePath,
                                 m_settings.cacheLimits,
-                                m_settings.inferenceThreadCount,
+                                std::max(1,
+                                        static_cast<int>(
+                                                std::lround(
+                                                        m_pInferenceThreads
+                                                                ->get()))),
                                 m_settings.bitRatePerStream,
                         },
                         [this] {
@@ -177,6 +261,26 @@ bool StemStatusControlProvider::initialize(
             this,
             [this] {
                 updateWorkerState();
+            });
+    connect(m_pManager.get(),
+            &StemSeparationManager::jobFramesAvailable,
+            this,
+            [this](const QString& jobId,
+                    qulonglong readyFrameCount,
+                    qulonglong) {
+                if (readyFrameCount == 0) {
+                    return;
+                }
+                for (const auto& pDeckState : m_decks) {
+                    if (pDeckState->jobId == jobId) {
+                        pDeckState->pLiveReady
+                                ->setAndConfirm(1.0);
+                        pDeckState->pDeck
+                                ->publishStemFramesAvailable(
+                                        static_cast<SINT>(
+                                                readyFrameCount));
+                    }
+                }
             });
     if (!m_pManager->initialize(pErrorMessage)) {
         m_pManager.reset();
@@ -229,9 +333,17 @@ void StemStatusControlProvider::registerDeck(
             group, QStringLiteral("separation_queue_position"), -1.0);
     pDeckState->pCacheStatus = readOnlyControl(
             group, QStringLiteral("stem_cache_status"));
+    pDeckState->pLiveReady = readOnlyControl(
+            group, QStringLiteral("stem_live_ready"));
     pDeckState->pError = readOnlyControl(
             group, QStringLiteral("separation_error"));
     m_decks.insert(group, pDeckState);
+    const ConfigKey activeModeKey(
+            group, QStringLiteral("stem_active_mode"));
+    if (ControlObject::exists(activeModeKey)) {
+        ControlObject::set(
+                activeModeKey, m_pActiveMode->get());
+    }
     refreshProtectedEntryIds();
 
     connect(pDeckState->pTrigger.get(),
@@ -254,8 +366,36 @@ void StemStatusControlProvider::registerDeck(
             &BaseTrackPlayer::loadingTrack,
             this,
             [this, group](const TrackPointer& pNewTrack,
-                    const TrackPointer&) {
-                trackLoading(group, pNewTrack);
+                    const TrackPointer& pOldTrack) {
+                trackLoading(group, pNewTrack, pOldTrack);
+            });
+    connect(pDeck,
+            &BaseTrackPlayer::newTrackLoaded,
+            this,
+            [this, group](const TrackPointer& pTrack) {
+                const auto pDeckState = deckState(group);
+                if (pTrack && pDeckState &&
+                        pTrack->hasStemInfo()) {
+                    pDeckState->pLiveReady
+                            ->setAndConfirm(1.0);
+                    pDeckState->pState->setAndConfirm(
+                            static_cast<double>(
+                                    StemSeparationState::Ready));
+                    pDeckState->pPercentage
+                            ->setAndConfirm(100.0);
+                    pDeckState->pCacheStatus->setAndConfirm(
+                            static_cast<double>(
+                                    CacheStatus::Ready));
+                    return;
+                }
+                if (pTrack && pDeckState &&
+                        pDeckState->pCacheStatus->get() !=
+                                static_cast<double>(
+                                        CacheStatus::Ready)) {
+                    trigger(group,
+                            StemSeparationPriority::
+                                    LoadedNotPlaying);
+                }
             });
     pDeck->setAlternateAudioSourceResolver(
             [weakThis = QPointer<StemStatusControlProvider>(this),
@@ -280,7 +420,8 @@ StemStatusControlProvider::deckState(
 }
 
 void StemStatusControlProvider::trigger(
-        const QString& group) {
+        const QString& group,
+        StemSeparationPriority priority) {
     auto pDeckState = deckState(group);
     if (!pDeckState || !m_initialized ||
             !m_pEnabled->toBool()) {
@@ -297,6 +438,7 @@ void StemStatusControlProvider::trigger(
         return;
     }
     pDeckState->sourceFilePath = pTrack->getLocation();
+    pDeckState->requestedPriority = priority;
     pDeckState->pError->setAndConfirm(
             static_cast<double>(ErrorCode::None));
     refreshProtectedEntryIds();
@@ -310,6 +452,52 @@ void StemStatusControlProvider::trigger(
                         ErrorCode::ModelUnavailable));
         m_pModelManager->requestAvailable();
         updateWorkerState();
+        return;
+    }
+    if (!pDeckState->liveSessionId.isEmpty()) {
+        const auto pLiveSession =
+                StemLiveSessionRegistry::find(
+                        pDeckState->liveSessionId);
+        const auto pTemporarySession = pLiveSession
+                ? pLiveSession->temporarySession()
+                : nullptr;
+        if (pTemporarySession) {
+            const auto readyFrameCount =
+                    pTemporarySession->readyFrameCount.load(
+                            std::memory_order_acquire);
+            if (readyFrameCount > 0) {
+                pDeckState->pLiveReady->setAndConfirm(1.0);
+                pDeckState->pDeck
+                        ->publishStemFramesAvailable(
+                                static_cast<SINT>(
+                                        readyFrameCount));
+            }
+            if (pTemporarySession->complete.load(
+                        std::memory_order_acquire)) {
+                pDeckState->pState->setAndConfirm(
+                        static_cast<double>(
+                                StemSeparationState::Ready));
+                pDeckState->pPercentage->setAndConfirm(100.0);
+                pDeckState->pCacheStatus->setAndConfirm(
+                        static_cast<double>(
+                                CacheStatus::Ready));
+                return;
+            }
+        }
+        pDeckState->pState->setAndConfirm(
+                static_cast<double>(
+                        StemSeparationState::Preparing));
+        pDeckState->pPercentage->setAndConfirm(0.0);
+        pDeckState->pQueuePosition->setAndConfirm(-1.0);
+        pDeckState->pCacheStatus->setAndConfirm(
+                static_cast<double>(CacheStatus::Processing));
+        QString error;
+        enqueueRequest(pDeckState,
+                pDeckState->sourceFilePath,
+                pDeckState->liveSessionId,
+                QFileInfo(pDeckState->sourceFilePath)
+                        .fileName(),
+                &error);
         return;
     }
     beginFingerprint(pDeckState);
@@ -444,16 +632,33 @@ void StemStatusControlProvider::fingerprintFinished(
                 static_cast<double>(ErrorCode::InvalidSource));
         return;
     }
-    pDeckState->cacheEntryId = key->id();
+    enqueueRequest(pDeckState,
+            std::move(sourceFilePath),
+            key->id(),
+            std::move(displayName),
+            &error);
+}
+
+void StemStatusControlProvider::enqueueRequest(
+        const std::shared_ptr<DeckState>& pDeckState,
+        QString sourceFilePath,
+        QString cacheEntryId,
+        QString displayName,
+        QString* pErrorMessage) {
+    if (!pDeckState || !m_pManager) {
+        return;
+    }
+    pDeckState->cacheEntryId = std::move(cacheEntryId);
     pDeckState->jobId = m_pManager->enqueue(
             StemSeparationRequest{
                     std::move(sourceFilePath),
                     pDeckState->cacheEntryId,
                     std::move(displayName),
-                    StemSeparationPriority::Manual,
+                    pDeckState->requestedPriority,
                     2,
+                    pDeckState->liveSessionId,
             },
-            &error);
+            pErrorMessage);
     if (pDeckState->jobId.isEmpty()) {
         pDeckState->pState->setAndConfirm(
                 static_cast<double>(
@@ -478,39 +683,135 @@ QUrl StemStatusControlProvider::resolveForDeck(
             !m_pAlternateSourceLinker) {
         return {};
     }
-    resetDeck(pDeckState.get(), pTrack);
+    const auto sourceFilePath = pTrack->getLocation();
+    if (pDeckState->sourceFilePath !=
+            sourceFilePath) {
+        pDeckState->previousSourceFilePath =
+                pDeckState->sourceFilePath;
+        pDeckState->previousCacheEntryId =
+                pDeckState->cacheEntryId;
+        pDeckState->previousLiveSessionId =
+                pDeckState->liveSessionId;
+        resetDeck(pDeckState.get(), pTrack);
+    }
+    const auto lowerSourceFilePath =
+            sourceFilePath.toLower();
+    if (pTrack->hasStemInfo() ||
+            lowerSourceFilePath.endsWith(
+                    QStringLiteral(".stem.mp4")) ||
+            lowerSourceFilePath.endsWith(
+                    QStringLiteral(".stem.m4a"))) {
+        pDeckState->pLiveReady->setAndConfirm(1.0);
+        return {};
+    }
     QString error;
     const auto resolution =
             m_pAlternateSourceLinker->resolve(
-                    pTrack->getLocation(), &error);
-    if (!resolution) {
+                    sourceFilePath, &error);
+    if (resolution) {
+        pDeckState->cacheEntryId = resolution->entryId;
+        pDeckState->pCacheStatus->setAndConfirm(
+                static_cast<double>(CacheStatus::Ready));
+        pDeckState->pState->setAndConfirm(
+                static_cast<double>(
+                        StemSeparationState::Ready));
+        pDeckState->pPercentage->setAndConfirm(100.0);
+        pDeckState->pLiveReady->setAndConfirm(1.0);
+        refreshProtectedEntryIds();
+        return QUrl::fromLocalFile(
+                resolution->filePath);
+    }
+    if (!pDeckState->liveSessionId.isEmpty()) {
+        const auto pLiveSession =
+                StemLiveSessionRegistry::find(
+                        pDeckState->liveSessionId);
+        if (pLiveSession) {
+            return pLiveSession->url();
+        }
+    }
+    const auto pLiveSession =
+            StemLiveSessionRegistry::acquire(
+                    QDir(m_settings.rootDirectoryPath)
+                            .filePath(kLiveDirectoryName),
+                    pTrack);
+    if (!pLiveSession) {
         return {};
     }
-    pDeckState->cacheEntryId = resolution->entryId;
-    pDeckState->pCacheStatus->setAndConfirm(
-            static_cast<double>(CacheStatus::Ready));
-    pDeckState->pState->setAndConfirm(
-            static_cast<double>(
-                    StemSeparationState::Ready));
-    pDeckState->pPercentage->setAndConfirm(100.0);
-    refreshProtectedEntryIds();
-    return QUrl::fromLocalFile(resolution->filePath);
+    pDeckState->liveSessionId =
+            pLiveSession->id();
+    return pLiveSession->url();
 }
 
 void StemStatusControlProvider::trackLoading(
         const QString& group,
-        const TrackPointer& pNewTrack) {
+        const TrackPointer& pNewTrack,
+        const TrackPointer& pOldTrack) {
     auto pDeckState = deckState(group);
     if (!pDeckState) {
         return;
     }
-    if (!pNewTrack) {
-        resetDeck(pDeckState.get(), {});
+    auto oldSourceFilePath =
+            pDeckState->previousSourceFilePath;
+    auto oldCacheEntryId =
+            pDeckState->previousCacheEntryId;
+    auto oldLiveSessionId =
+            pDeckState->previousLiveSessionId;
+    pDeckState->previousSourceFilePath.clear();
+    pDeckState->previousCacheEntryId.clear();
+    pDeckState->previousLiveSessionId.clear();
+    if (pOldTrack && pNewTrack &&
+            pNewTrack->getLocation() ==
+                    pOldTrack->getLocation()) {
         return;
     }
-    if (pDeckState->sourceFilePath !=
+    if (oldSourceFilePath.isEmpty() && pOldTrack &&
+            pDeckState->sourceFilePath ==
+                    pOldTrack->getLocation()) {
+        oldSourceFilePath = pDeckState->sourceFilePath;
+        oldCacheEntryId = pDeckState->cacheEntryId;
+        oldLiveSessionId =
+                pDeckState->liveSessionId;
+    }
+    if (!pNewTrack) {
+        resetDeck(pDeckState.get(), {});
+    } else if (pDeckState->sourceFilePath !=
             pNewTrack->getLocation()) {
         resetDeck(pDeckState.get(), pNewTrack);
+    }
+    if (!oldLiveSessionId.isEmpty()) {
+        StemLiveSessionRegistry::release(
+                oldLiveSessionId, pOldTrack);
+    }
+    if (!pOldTrack || !m_pManager) {
+        return;
+    }
+    if (oldSourceFilePath.isEmpty()) {
+        oldSourceFilePath = pOldTrack->getLocation();
+    }
+    const bool stillLoaded = std::any_of(
+            m_decks.cbegin(),
+            m_decks.cend(),
+            [&](const auto& otherDeckState) {
+                return otherDeckState->sourceFilePath ==
+                        oldSourceFilePath;
+            });
+    if (stillLoaded) {
+        return;
+    }
+    QSet<QString> discardedEntryIds;
+    if (!oldCacheEntryId.isEmpty()) {
+        discardedEntryIds.insert(oldCacheEntryId);
+    }
+    for (const auto& snapshot : m_pManager->snapshots()) {
+        if (snapshot.request.sourceFilePath ==
+                oldSourceFilePath) {
+            m_pManager->cancel(snapshot.jobId);
+            discardedEntryIds.insert(
+                    snapshot.request.cacheEntryId);
+        }
+    }
+    for (const auto& entryId : discardedEntryIds) {
+        m_pManager->discardCached(entryId);
     }
 }
 
@@ -521,9 +822,11 @@ void StemStatusControlProvider::modelAvailabilityChanged(
         for (const auto& pDeckState : m_decks) {
             if (pDeckState->pendingModel &&
                     !pDeckState->sourceFilePath.isEmpty()) {
+                pDeckState->pendingModel = false;
                 pDeckState->pError->setAndConfirm(
                         static_cast<double>(ErrorCode::None));
-                beginFingerprint(pDeckState);
+                trigger(pDeckState->pDeck->getGroup(),
+                        pDeckState->requestedPriority);
             }
         }
     }
@@ -613,6 +916,7 @@ void StemStatusControlProvider::resetDeck(
             pTrack ? pTrack->getLocation() : QString{};
     pDeckState->jobId.clear();
     pDeckState->cacheEntryId.clear();
+    pDeckState->liveSessionId.clear();
     pDeckState->pendingModel = false;
     pDeckState->pPercentage->setAndConfirm(0.0);
     pDeckState->pState->setAndConfirm(
@@ -622,6 +926,7 @@ void StemStatusControlProvider::resetDeck(
     pDeckState->pQueuePosition->setAndConfirm(-1.0);
     pDeckState->pCacheStatus->setAndConfirm(
             static_cast<double>(CacheStatus::None));
+    pDeckState->pLiveReady->setAndConfirm(0.0);
     pDeckState->pError->setAndConfirm(
             static_cast<double>(ErrorCode::None));
     if (!pTrack || !m_pManager) {

@@ -1,10 +1,12 @@
 #include <QCoreApplication>
 #include <QElapsedTimer>
 #include <QFile>
+#include <QFileInfo>
 #include <QTemporaryDir>
 #include <QThread>
 #include <QVector>
 #include <algorithm>
+#include <atomic>
 #include <functional>
 
 #include "control/controlobject.h"
@@ -30,9 +32,22 @@ class FakeDeck final : public BaseTrackPlayer {
     void setupEqControls() final {
     }
 
+    const QUrl& lastAlternateUrl() const {
+        return m_lastAlternateUrl;
+    }
+
+    SINT publishedStemFrameCount() const {
+        return m_publishedStemFrameCount;
+    }
+
     void setAlternateAudioSourceResolver(
             const AlternateAudioSourceResolver& resolver) final {
         m_resolver = resolver;
+    }
+
+    void publishStemFramesAvailable(
+            SINT readyFrameCount) final {
+        m_publishedStemFrameCount = readyFrameCount;
     }
 
     void slotLoadTrack(TrackPointer pTrack,
@@ -65,6 +80,7 @@ class FakeDeck final : public BaseTrackPlayer {
     TrackPointer m_pTrack;
     AlternateAudioSourceResolver m_resolver;
     QUrl m_lastAlternateUrl;
+    SINT m_publishedStemFrameCount = 0;
 };
 
 class SuccessfulProcessor final
@@ -76,6 +92,7 @@ class SuccessfulProcessor final
         callbacks.publishProgress(0.25F);
         callbacks.publishState(StemSeparationState::Separating);
         callbacks.publishProgress(0.75F);
+        callbacks.publishAvailableFrames(44100, 88200);
         callbacks.publishState(StemSeparationState::Encoding);
         callbacks.publishState(StemSeparationState::Validating);
         return {Outcome::Completed, {}};
@@ -85,6 +102,10 @@ class SuccessfulProcessor final
 class CancellableProcessor final
         : public StemSeparationProcessor {
   public:
+    void discardCached(const QString&) final {
+        m_discardCount.fetch_add(1, std::memory_order_acq_rel);
+    }
+
     Result process(const StemSeparationRequest&,
             const Callbacks& callbacks) final {
         callbacks.publishState(StemSeparationState::Separating);
@@ -93,6 +114,8 @@ class CancellableProcessor final
         }
         return {Outcome::Cancelled, {}};
     }
+
+    std::atomic_int m_discardCount{0};
 };
 
 class FailingProcessor final : public StemSeparationProcessor {
@@ -153,14 +176,9 @@ TEST_F(StemStatusControlProviderTest,
     ASSERT_TRUE(provider.initialize());
     FakeDeck deck(QStringLiteral("[Channel71]"));
     provider.registerDeck(&deck);
-    deck.slotLoadTrack(
-            Track::newTemporary(sourcePath), {}, false);
 
     EXPECT_TRUE(ControlObject::exists(ConfigKey(
             deck.getGroup(), QStringLiteral("separation_trigger"))));
-    EXPECT_DOUBLE_EQ(controlValue(deck.getGroup(),
-                             QStringLiteral("separation_state")),
-            static_cast<double>(StemSeparationState::Idle));
     EXPECT_DOUBLE_EQ(controlValue(QStringLiteral("[StemSeparation]"),
                              QStringLiteral("model_available")),
             1.0);
@@ -175,9 +193,12 @@ TEST_F(StemStatusControlProviderTest,
             [&](double value) {
                 observedProgress.push_back(value);
             });
-    ControlObject::set(ConfigKey(deck.getGroup(),
-                               QStringLiteral("separation_trigger")),
-            1.0);
+    deck.slotLoadTrack(
+            Track::newTemporary(sourcePath), {}, false);
+    EXPECT_EQ(QFileInfo(
+                      deck.lastAlternateUrl().toLocalFile())
+                      .suffix(),
+            QStringLiteral("stemlive"));
 
     ASSERT_TRUE(waitUntil([&] {
         return controlValue(deck.getGroup(),
@@ -193,6 +214,10 @@ TEST_F(StemStatusControlProviderTest,
     EXPECT_DOUBLE_EQ(controlValue(QStringLiteral("[StemSeparation]"),
                              QStringLiteral("queue_size")),
             0.0);
+    EXPECT_DOUBLE_EQ(controlValue(deck.getGroup(),
+                             QStringLiteral("stem_live_ready")),
+            1.0);
+    EXPECT_EQ(deck.publishedStemFrameCount(), 44100);
     ASSERT_FALSE(observedProgress.isEmpty());
     EXPECT_TRUE(std::is_sorted(
             observedProgress.cbegin(), observedProgress.cend()));
@@ -218,10 +243,6 @@ TEST_F(StemStatusControlProviderTest,
     provider.registerDeck(&deck);
     deck.slotLoadTrack(
             Track::newTemporary(sourcePath), {}, false);
-
-    ControlObject::set(ConfigKey(deck.getGroup(),
-                               QStringLiteral("separation_trigger")),
-            1.0);
 
     ASSERT_TRUE(waitUntil([&] {
         return controlValue(deck.getGroup(),
@@ -257,9 +278,6 @@ TEST_F(StemStatusControlProviderTest,
     deck.slotLoadTrack(
             Track::newTemporary(sourcePath), {}, false);
 
-    ControlObject::set(ConfigKey(deck.getGroup(),
-                               QStringLiteral("separation_trigger")),
-            1.0);
     ASSERT_TRUE(waitUntil([&] {
         return controlValue(deck.getGroup(),
                        QStringLiteral("separation_state")) ==
@@ -285,15 +303,20 @@ TEST_F(StemStatusControlProviderTest,
     deck.slotLoadTrack(
             Track::newTemporary(secondSourcePath), {}, false);
 
+    ASSERT_TRUE(waitUntil([&] {
+        return controlValue(deck.getGroup(),
+                       QStringLiteral("separation_state")) ==
+                static_cast<double>(
+                        StemSeparationState::Separating);
+    }));
+    deck.slotEjectTrack(1.0);
     EXPECT_DOUBLE_EQ(controlValue(deck.getGroup(),
                              QStringLiteral("separation_state")),
             static_cast<double>(StemSeparationState::Idle));
-    EXPECT_DOUBLE_EQ(controlValue(deck.getGroup(),
-                             QStringLiteral("separation_percentage")),
-            0.0);
-    EXPECT_DOUBLE_EQ(controlValue(deck.getGroup(),
-                             QStringLiteral("separation_queue_position")),
-            -1.0);
+    ASSERT_TRUE(waitUntil([&] {
+        return pProcessor->m_discardCount.load(
+                       std::memory_order_acquire) >= 2;
+    }));
 }
 
 } // namespace

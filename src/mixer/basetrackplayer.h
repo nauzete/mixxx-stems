@@ -61,6 +61,9 @@ class BaseTrackPlayer : public BasePlayer {
             const AlternateAudioSourceResolver& resolver) {
         Q_UNUSED(resolver);
     }
+    virtual void publishStemFramesAvailable(SINT readyFrameCount) {
+        Q_UNUSED(readyFrameCount);
+    }
 #endif
 
   public slots:
@@ -123,6 +126,8 @@ class BaseTrackPlayerImpl : public BaseTrackPlayer {
 #ifdef __STEM__
     void setAlternateAudioSourceResolver(
             const AlternateAudioSourceResolver& resolver) final;
+    void publishStemFramesAvailable(
+            SINT readyFrameCount) final;
 #endif
 
   public slots:

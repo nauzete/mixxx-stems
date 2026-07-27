@@ -10,21 +10,23 @@ The implementation is split into independent layers:
 
 1. a validated ONNX model contract and CPU inference runner;
 2. bounded decoding, normalization, segmentation, overlap-add, and progress;
-3. incremental five-stream STEM MP4 encoding and atomic publication;
-4. a persistent priority queue and quota-bound LRU cache;
-5. original-to-generated source linking at the next deck load;
+3. progressive disk-backed PCM16 publication for the loaded decks;
+4. selective `CachingReader` replacement of original-audio fallback chunks;
+5. optional five-stream STEM MP4 encoding and a quota-bound LRU cache;
 6. stable ControlObjects consumed by the skin and controller mapping.
 
 Inference, decoding, encoding, hashing, file access, and large allocation take
 place on low-priority background workers. The audio thread does not perform
-model inference, locks, file I/O, or blocking work. A generated file is never
-hot-swapped into a playing deck.
+model inference, locks, file I/O, or blocking work. A loaded track begins with
+an eight-channel unity-sum fallback, then already cached fallback blocks are
+selectively discarded as separated chunks become readable.
 
 ## User interface
 
 Select the `PioneerXDJ-RR Stems` skin for a compact 800 x 480 touch interface.
-It exposes both decks, four stem mute/volume/color rows, generation,
-cancellation, progress, queue, cache, model, worker, and error state.
+It exposes both decks, four color-coded 2x2 stem pads, a global Mute/Solo mode,
+an inference-thread selector, and deck eject controls. Separation starts
+automatically when a track loads.
 
 Select `Pioneer DDJ-FLX4 Stems` as the controller mapping. The official
 mapping behavior is retained. Keyboard mode pads 1-4 control drums, bass,
@@ -40,10 +42,11 @@ The pinned model is downloaded from the
 `db37d1314ac1e1051e7978d25ef45b3f1d3f43c837678752f592c0f2deca752d`.
 The model is not stored in Git.
 
-Generated audio uses AAC-LC at 44.1 kHz in a five-stream MP4: premix, drums,
-bass, other, and vocals. At the default 128 kbit/s per stream, a four-minute
-file is estimated at 19.2 MB before container overhead, below the 32 MiB
-target. Only an exact `.partial` file is used before atomic publication.
+The automatic live path writes interleaved eight-channel PCM16 to disk as each
+stride completes. It never retains complete float32 stems in RAM and removes
+the temporary file when the last deck using the track is ejected. A 512 MiB
+guard prevents unbounded temporary output. The existing offline cache path can
+still publish an AAC-LC five-stream MP4 atomically.
 
 See the component documents in this directory for cache, queue, container,
 library-linking, controls, model, packaging, and benchmark details.
