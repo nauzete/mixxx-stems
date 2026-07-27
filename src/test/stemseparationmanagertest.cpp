@@ -36,6 +36,7 @@ StemSeparationRequest request(
             name,
             priority,
             2,
+            {},
     };
 }
 

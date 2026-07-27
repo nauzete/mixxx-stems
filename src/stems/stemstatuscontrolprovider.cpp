@@ -375,7 +375,7 @@ void StemStatusControlProvider::registerDeck(
             [this, group](const TrackPointer& pTrack) {
                 const auto pDeckState = deckState(group);
                 if (pTrack && pDeckState &&
-                        pTrack->hasStemInfo()) {
+                        pTrack->hasStem()) {
                     pDeckState->pLiveReady
                             ->setAndConfirm(1.0);
                     pDeckState->pState->setAndConfirm(
@@ -696,7 +696,7 @@ QUrl StemStatusControlProvider::resolveForDeck(
     }
     const auto lowerSourceFilePath =
             sourceFilePath.toLower();
-    if (pTrack->hasStemInfo() ||
+    if (pTrack->hasStem() ||
             lowerSourceFilePath.endsWith(
                     QStringLiteral(".stem.mp4")) ||
             lowerSourceFilePath.endsWith(

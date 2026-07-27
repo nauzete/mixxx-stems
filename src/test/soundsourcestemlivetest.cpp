@@ -8,12 +8,15 @@
 #include "stems/stemlivesessionregistry.h"
 #include "stems/stemtemporarystore.h"
 #include "test/mixxxtest.h"
+#include "test/soundsourceproviderregistration.h"
 #include "track/track.h"
 
 namespace mixxx {
 namespace {
 
-class SoundSourceStemLiveTest : public MixxxTest {
+class SoundSourceStemLiveTest
+        : public MixxxTest,
+          SoundSourceProviderRegistration {
 };
 
 TEST_F(SoundSourceStemLiveTest,
