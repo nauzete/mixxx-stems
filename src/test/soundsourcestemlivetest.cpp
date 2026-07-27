@@ -91,6 +91,80 @@ TEST_F(SoundSourceStemLiveTest,
 }
 
 TEST_F(SoundSourceStemLiveTest,
+        ReplacesFallbackWithoutReopeningTheSource) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto pTrack = Track::newTemporary(
+            getTestDir().filePath(
+                    QStringLiteral("sine-30.wav")));
+    auto pLiveSession =
+            stems::StemLiveSessionRegistry::acquire(
+                    directory.path(), pTrack);
+    ASSERT_TRUE(pLiveSession);
+
+    SoundSourceStemLive source(pLiveSession->url());
+    ASSERT_EQ(source.open(SoundSource::OpenMode::Strict),
+            SoundSource::OpenResult::Succeeded);
+    std::array<CSAMPLE, 8> fallback{};
+    ASSERT_EQ(source.readSampleFrames(
+                      WritableSampleFrames(
+                              IndexRange::forward(
+                                      source.frameIndexMin(),
+                                      1),
+                              SampleBuffer::WritableSlice(
+                                      fallback.data(),
+                                      fallback.size())))
+                      .readableLength(),
+            8);
+
+    stems::StemTemporaryStore store(
+            directory.path(), 4096);
+    QString error;
+    ASSERT_TRUE(store.initialize(
+            pLiveSession->id(), 1, &error));
+    const std::array<float, 8> separated = {
+            -0.8F,
+            -0.6F,
+            -0.4F,
+            -0.2F,
+            0.2F,
+            0.4F,
+            0.6F,
+            0.8F,
+    };
+    ASSERT_TRUE(store.append(
+            0, 1, separated, &error));
+    pLiveSession->publishTemporarySession(
+            store.session());
+
+    std::array<CSAMPLE, 8> hotOutput{};
+    ASSERT_EQ(source.readSampleFrames(
+                      WritableSampleFrames(
+                              IndexRange::forward(
+                                      source.frameIndexMin(),
+                                      1),
+                              SampleBuffer::WritableSlice(
+                                      hotOutput.data(),
+                                      hotOutput.size())))
+                      .readableLength(),
+            8);
+    for (std::size_t index = 0;
+            index < hotOutput.size();
+            ++index) {
+        EXPECT_NEAR(hotOutput[index],
+                separated[index],
+                1.0F / 32767.0F);
+    }
+    EXPECT_NE(fallback, hotOutput);
+
+    source.close();
+    stems::StemLiveSessionRegistry::release(
+            pLiveSession->id(), pTrack);
+    pLiveSession.reset();
+    ASSERT_TRUE(store.remove(&error));
+}
+
+TEST_F(SoundSourceStemLiveTest,
         RemovesCrashLeftoversButPreservesActiveSessions) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());

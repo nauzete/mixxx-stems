@@ -40,6 +40,10 @@ class FakeDeck final : public BaseTrackPlayer {
         return m_publishedStemFrameCount;
     }
 
+    int loadCount() const {
+        return m_loadCount;
+    }
+
     void setAlternateAudioSourceResolver(
             const AlternateAudioSourceResolver& resolver) final {
         m_resolver = resolver;
@@ -53,6 +57,7 @@ class FakeDeck final : public BaseTrackPlayer {
     void slotLoadTrack(TrackPointer pTrack,
             mixxx::StemChannelSelection,
             bool) final {
+        ++m_loadCount;
         const auto pOldTrack = m_pTrack;
         if (pTrack && m_resolver) {
             m_lastAlternateUrl = m_resolver(pTrack);
@@ -81,6 +86,7 @@ class FakeDeck final : public BaseTrackPlayer {
     AlternateAudioSourceResolver m_resolver;
     QUrl m_lastAlternateUrl;
     SINT m_publishedStemFrameCount = 0;
+    int m_loadCount = 0;
 };
 
 class SuccessfulProcessor final
@@ -218,6 +224,8 @@ TEST_F(StemStatusControlProviderTest,
                              QStringLiteral("stem_live_ready")),
             1.0);
     EXPECT_EQ(deck.publishedStemFrameCount(), 44100);
+    EXPECT_EQ(deck.loadCount(), 1)
+            << "Publishing live stems must not reload the deck";
     ASSERT_FALSE(observedProgress.isEmpty());
     EXPECT_TRUE(std::is_sorted(
             observedProgress.cbegin(), observedProgress.cend()));
