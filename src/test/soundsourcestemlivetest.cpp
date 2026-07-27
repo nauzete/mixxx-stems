@@ -33,8 +33,8 @@ TEST_F(SoundSourceStemLiveTest,
             stems::StemLiveSessionRegistry::acquire(
                     directory.path(), pSecondTrack);
     ASSERT_EQ(pSecondLiveSession, pLiveSession);
-    EXPECT_TRUE(pTrack->hasStemInfo());
-    EXPECT_TRUE(pSecondTrack->hasStemInfo());
+    EXPECT_TRUE(pTrack->hasStem());
+    EXPECT_TRUE(pSecondTrack->hasStem());
 
     stems::StemTemporaryStore store(
             directory.path(), 4096);
@@ -81,12 +81,12 @@ TEST_F(SoundSourceStemLiveTest,
     stems::StemLiveSessionRegistry::release(
             pSecondLiveSession->id(), pSecondTrack);
     pSecondLiveSession.reset();
-    EXPECT_TRUE(pTrack->hasStemInfo());
-    EXPECT_FALSE(pSecondTrack->hasStemInfo());
+    EXPECT_TRUE(pTrack->hasStem());
+    EXPECT_FALSE(pSecondTrack->hasStem());
     stems::StemLiveSessionRegistry::release(
             pLiveSession->id(), pTrack);
     pLiveSession.reset();
-    EXPECT_FALSE(pTrack->hasStemInfo());
+    EXPECT_FALSE(pTrack->hasStem());
     ASSERT_TRUE(store.remove(&error))
             << error.toStdString();
 }
