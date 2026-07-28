@@ -24,12 +24,12 @@ Ort::SessionOptions makeSessionOptions(int intraOpThreadCount) {
     options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
     options.SetIntraOpNumThreads(intraOpThreadCount);
     options.SetInterOpNumThreads(1);
-#if defined(_M_ARM64) || defined(__aarch64__)
-    // HTDemucs activations dominate peak memory on 4 GiB Raspberry Pi
-    // systems. Direct CPU allocations trade some inference latency for a
-    // substantially lower peak than the reusable arena.
+    // HTDemucs activations dominate memory usage. The CPU arena retains its
+    // high-water mark after the first chunk, which kept multiple GiB committed
+    // for the lifetime of Mixxx on Windows. Direct allocations release each
+    // chunk's temporary activations once inference returns.
     options.DisableCpuMemArena();
-#endif
+    options.DisableMemPattern();
     options.SetGraphOptimizationLevel(
             GraphOptimizationLevel::ORT_ENABLE_ALL);
     return options;
