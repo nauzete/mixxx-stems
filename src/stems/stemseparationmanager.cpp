@@ -192,7 +192,8 @@ void StemSeparationManager::setPaused(bool paused) {
                 emit jobChanged(jobId);
             }
         }
-        for (const auto& activeJobId : m_activeJobIds) {
+        for (const auto& activeJobId :
+                std::as_const(m_activeJobIds)) {
             auto active = m_jobs.find(activeJobId);
             if (active != m_jobs.end()) {
                 active->pCancellation->pauseRequested.store(
