@@ -43,10 +43,8 @@ StemSeparationRequest request(
 StemSeparationRequest liveRequest(const QString& name) {
     auto result = request(
             name, StemSeparationPriority::LoadedNotPlaying);
-    result.liveSessionId =
-            (QStringLiteral("live-") + name)
-                    .repeated(64)
-                    .left(64);
+    const QString liveName = QStringLiteral("live-") + name;
+    result.liveSessionId = liveName.repeated(64).left(64);
     return result;
 }
 
