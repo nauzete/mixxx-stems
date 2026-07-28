@@ -3,6 +3,7 @@
 #include <QHash>
 #include <QList>
 #include <QObject>
+#include <QSet>
 #include <QString>
 #include <QThreadPool>
 #include <atomic>
@@ -85,7 +86,9 @@ class StemSeparationProcessor {
             const Callbacks& callbacks) = 0;
 };
 
-/// Owns a persistent priority queue and runs at most one separation processor.
+/// Owns a persistent priority queue. Regular cache jobs run one at a time;
+/// up to two live deck jobs may run concurrently while sharing one serialized
+/// inference runner.
 ///
 /// Public methods belong to this object's thread. Processor work runs on a
 /// dedicated low-priority thread and communicates through queued callbacks.
@@ -158,9 +161,10 @@ class StemSeparationManager final : public QObject {
     QString m_queueFilePath;
     std::shared_ptr<StemSeparationProcessor> m_pProcessor;
     QThreadPool m_workerPool;
+    QThreadPool m_maintenancePool;
     QHash<QString, JobRecord> m_jobs;
     QList<QString> m_queue;
-    QString m_activeJobId;
+    QSet<QString> m_activeJobIds;
     qint64 m_nextSequence = 0;
     bool m_initialized = false;
     bool m_paused = false;

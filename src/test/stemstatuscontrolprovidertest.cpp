@@ -342,12 +342,13 @@ TEST_F(StemStatusControlProviderTest,
     // newTrackLoaded cannot arrive until the live source has its first chunk.
     secondDeck.beginLoadTrack(
             Track::newTemporary(secondSourcePath));
-    EXPECT_DOUBLE_EQ(controlValue(secondDeck.getGroup(),
-                             QStringLiteral("separation_state")),
-            static_cast<double>(StemSeparationState::Queued));
-    EXPECT_DOUBLE_EQ(controlValue(QStringLiteral("[StemSeparation]"),
-                             QStringLiteral("queue_size")),
-            1.0);
+    ASSERT_TRUE(waitUntil([&] {
+        return pProcessor->m_invocationCount.load(
+                       std::memory_order_acquire) == 2;
+    }));
+    EXPECT_NE(controlValue(secondDeck.getGroup(),
+                      QStringLiteral("separation_state")),
+            static_cast<double>(StemSeparationState::Idle));
 
     pProcessor->m_releaseFirst.store(
             true, std::memory_order_release);

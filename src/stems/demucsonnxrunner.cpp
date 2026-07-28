@@ -3,6 +3,9 @@
 #include <onnxruntime_cxx_api.h>
 
 #include <array>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -138,6 +141,10 @@ class DemucsOnnxRunner::Impl final {
     Ort::Env m_environment;
     Ort::SessionOptions m_sessionOptions;
     Ort::Session m_session;
+    mutable std::atomic_uint64_t m_nextRunTicket{0};
+    mutable std::uint64_t m_servingRunTicket = 0;
+    mutable std::mutex m_runMutex;
+    mutable std::condition_variable m_runCondition;
 };
 
 DemucsOnnxRunner::DemucsOnnxRunner(
@@ -165,57 +172,88 @@ std::vector<float> DemucsOnnxRunner::run(
         throw std::invalid_argument(
                 "HTDemucs input contains an unexpected number of elements");
     }
-    const std::array<int64_t, 3> inputShape = {
-            static_cast<int64_t>(kBatchSize),
-            static_cast<int64_t>(kAudioChannelCount),
-            static_cast<int64_t>(segmentSampleCount()),
+    const auto ticket = m_pImpl->m_nextRunTicket.fetch_add(
+            1, std::memory_order_relaxed);
+    std::unique_lock runLock(m_pImpl->m_runMutex);
+    m_pImpl->m_runCondition.wait(runLock, [&] {
+        return ticket == m_pImpl->m_servingRunTicket;
+    });
+    const auto finishTurn = [&] {
+        ++m_pImpl->m_servingRunTicket;
+        runLock.unlock();
+        m_pImpl->m_runCondition.notify_all();
     };
-    const std::array<int64_t, 4> outputShape = {
-            static_cast<int64_t>(kBatchSize),
-            static_cast<int64_t>(kSourceCount),
-            static_cast<int64_t>(kAudioChannelCount),
-            static_cast<int64_t>(segmentSampleCount()),
-    };
 
-    const auto memoryInfo =
-            Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-    auto inputTensor = Ort::Value::CreateTensor<float>(memoryInfo,
-            const_cast<float*>(input.data()),
-            input.size(),
-            inputShape.data(),
-            inputShape.size());
-    const std::array inputNames = {m_pImpl->m_contract.inputName.c_str()};
-    const std::array outputNames = {m_pImpl->m_contract.outputName.c_str()};
-    auto outputs = m_pImpl->m_session.Run(Ort::RunOptions{nullptr},
-            inputNames.data(),
-            &inputTensor,
-            inputNames.size(),
-            outputNames.data(),
-            outputNames.size());
-    if (outputs.size() != 1 || !outputs.front().IsTensor()) {
-        throw std::runtime_error(
-                "ONNX Runtime returned an unexpected output value");
-    }
+    try {
+        const std::array<int64_t, 3> inputShape = {
+                static_cast<int64_t>(kBatchSize),
+                static_cast<int64_t>(kAudioChannelCount),
+                static_cast<int64_t>(segmentSampleCount()),
+        };
+        const std::array<int64_t, 4> outputShape = {
+                static_cast<int64_t>(kBatchSize),
+                static_cast<int64_t>(kSourceCount),
+                static_cast<int64_t>(kAudioChannelCount),
+                static_cast<int64_t>(segmentSampleCount()),
+        };
 
-    const auto outputInfo = outputs.front().GetTensorTypeAndShapeInfo();
-    if (outputInfo.GetElementType() !=
-            ONNXTensorElementDataType::ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
-        throw std::runtime_error("ONNX Runtime returned a non-float output");
-    }
-    if (outputInfo.GetShape() !=
-            std::vector<int64_t>(
-                    outputShape.begin(), outputShape.end())) {
-        throw std::runtime_error(
-                "Unexpected runtime output shape: " +
-                shapeString(outputInfo.GetShape()));
-    }
-    if (outputInfo.GetElementCount() != outputElementCount()) {
-        throw std::runtime_error(
-                "ONNX Runtime returned an unexpected output element count");
-    }
+        const auto memoryInfo = Ort::MemoryInfo::CreateCpu(
+                OrtArenaAllocator, OrtMemTypeDefault);
+        auto inputTensor = Ort::Value::CreateTensor<float>(memoryInfo,
+                const_cast<float*>(input.data()),
+                input.size(),
+                inputShape.data(),
+                inputShape.size());
+        const std::array inputNames = {
+                m_pImpl->m_contract.inputName.c_str()};
+        const std::array outputNames = {
+                m_pImpl->m_contract.outputName.c_str()};
+        auto outputs = m_pImpl->m_session.Run(
+                Ort::RunOptions{nullptr},
+                inputNames.data(),
+                &inputTensor,
+                inputNames.size(),
+                outputNames.data(),
+                outputNames.size());
+        if (outputs.size() != 1 ||
+                !outputs.front().IsTensor()) {
+            throw std::runtime_error(
+                    "ONNX Runtime returned an unexpected output value");
+        }
 
-    const auto* const outputData = outputs.front().GetTensorData<float>();
-    return {outputData, outputData + outputElementCount()};
+        const auto outputInfo =
+                outputs.front().GetTensorTypeAndShapeInfo();
+        if (outputInfo.GetElementType() !=
+                ONNXTensorElementDataType::
+                        ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT) {
+            throw std::runtime_error(
+                    "ONNX Runtime returned a non-float output");
+        }
+        if (outputInfo.GetShape() !=
+                std::vector<int64_t>(
+                        outputShape.begin(),
+                        outputShape.end())) {
+            throw std::runtime_error(
+                    "Unexpected runtime output shape: " +
+                    shapeString(outputInfo.GetShape()));
+        }
+        if (outputInfo.GetElementCount() !=
+                outputElementCount()) {
+            throw std::runtime_error(
+                    "ONNX Runtime returned an unexpected output element count");
+        }
+
+        const auto* const outputData =
+                outputs.front().GetTensorData<float>();
+        auto result = std::vector<float>(
+                outputData,
+                outputData + outputElementCount());
+        finishTurn();
+        return result;
+    } catch (...) {
+        finishTurn();
+        throw;
+    }
 }
 
 std::string DemucsOnnxRunner::runtimeVersion() {

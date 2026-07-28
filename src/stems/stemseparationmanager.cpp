@@ -48,9 +48,12 @@ StemSeparationManager::StemSeparationManager(
         : QObject(pParent),
           m_queueFilePath(QDir::cleanPath(std::move(queueFilePath))),
           m_pProcessor(std::move(pProcessor)) {
-    m_workerPool.setMaxThreadCount(1);
+    m_workerPool.setMaxThreadCount(2);
     m_workerPool.setThreadPriority(QThread::LowPriority);
     m_workerPool.setExpiryTimeout(-1);
+    m_maintenancePool.setMaxThreadCount(1);
+    m_maintenancePool.setThreadPriority(QThread::LowPriority);
+    m_maintenancePool.setExpiryTimeout(-1);
 }
 
 StemSeparationManager::~StemSeparationManager() {
@@ -64,6 +67,8 @@ StemSeparationManager::~StemSeparationManager() {
     saveQueue();
     m_workerPool.clear();
     m_workerPool.waitForDone();
+    m_maintenancePool.clear();
+    m_maintenancePool.waitForDone();
 }
 
 bool StemSeparationManager::initialize(QString* pErrorMessage) {
@@ -139,14 +144,15 @@ bool StemSeparationManager::cancel(const QString& jobId) {
             false, std::memory_order_release);
     job->pCancellation->cancelled.store(
             true, std::memory_order_release);
-    if (jobId != m_activeJobId) {
+    const auto active = m_activeJobIds.contains(jobId);
+    if (!active) {
         m_queue.removeAll(jobId);
     }
     job->snapshot.state = StemSeparationState::Cancelled;
     job->snapshot.error.clear();
     saveQueue();
     notifyJobAndQueue(jobId);
-    if (jobId != m_activeJobId) {
+    if (!active) {
         startNext();
     }
     return true;
@@ -186,10 +192,12 @@ void StemSeparationManager::setPaused(bool paused) {
                 emit jobChanged(jobId);
             }
         }
-        auto active = m_jobs.find(m_activeJobId);
-        if (active != m_jobs.end()) {
-            active->pCancellation->pauseRequested.store(
-                    true, std::memory_order_release);
+        for (const auto& activeJobId : m_activeJobIds) {
+            auto active = m_jobs.find(activeJobId);
+            if (active != m_jobs.end()) {
+                active->pCancellation->pauseRequested.store(
+                        true, std::memory_order_release);
+            }
         }
     } else {
         for (auto job = m_jobs.begin(); job != m_jobs.end(); ++job) {
@@ -216,7 +224,7 @@ void StemSeparationManager::setInferenceThreadCount(
         return;
     }
     const auto pProcessor = m_pProcessor;
-    m_workerPool.start(QRunnable::create(
+    m_maintenancePool.start(QRunnable::create(
             [pProcessor, threadCount] {
                 pProcessor->setInferenceThreadCount(
                         threadCount);
@@ -230,7 +238,7 @@ void StemSeparationManager::discardCached(
         return;
     }
     const auto pProcessor = m_pProcessor;
-    m_workerPool.start(QRunnable::create(
+    m_maintenancePool.start(QRunnable::create(
             [pProcessor, entryId] {
                 pProcessor->discardCached(entryId);
             }));
@@ -252,7 +260,7 @@ int StemSeparationManager::queueSize() const noexcept {
 }
 
 int StemSeparationManager::activeJobCount() const noexcept {
-    return m_activeJobId.isEmpty() ? 0 : 1;
+    return m_activeJobIds.size();
 }
 
 std::optional<StemSeparationSnapshot> StemSeparationManager::snapshot(
@@ -422,31 +430,58 @@ void StemSeparationManager::insertQueued(const QString& jobId) {
 }
 
 void StemSeparationManager::startNext() {
-    if (!m_initialized || m_shuttingDown || m_paused ||
-            !m_activeJobId.isEmpty() || m_queue.isEmpty()) {
+    if (!m_initialized || m_shuttingDown || m_paused) {
         return;
     }
-    const auto jobId = m_queue.takeFirst();
-    auto job = m_jobs.find(jobId);
-    if (job == m_jobs.end() ||
-            job->snapshot.state != StemSeparationState::Queued) {
-        startNext();
-        return;
-    }
-    m_activeJobId = jobId;
-    job->snapshot.state = StemSeparationState::Preparing;
-    job->snapshot.percentage = 0.0F;
-    job->snapshot.error.clear();
-    ++job->snapshot.attemptCount;
-    const auto request = job->snapshot.request;
-    const auto cancellation = job->pCancellation;
-    saveQueue();
-    notifyJobAndQueue(jobId);
+    while (!m_queue.isEmpty()) {
+        int queueIndex = 0;
+        if (!m_activeJobIds.isEmpty()) {
+            if (m_activeJobIds.size() >= 2) {
+                return;
+            }
+            const auto activeJob =
+                    m_jobs.constFind(*m_activeJobIds.cbegin());
+            if (activeJob == m_jobs.cend() ||
+                    activeJob->snapshot.request.liveSessionId.isEmpty()) {
+                return;
+            }
+            queueIndex = -1;
+            for (int index = 0; index < m_queue.size(); ++index) {
+                const auto queuedJob =
+                        m_jobs.constFind(m_queue.at(index));
+                if (queuedJob != m_jobs.cend() &&
+                        !queuedJob->snapshot.request
+                                .liveSessionId.isEmpty()) {
+                    queueIndex = index;
+                    break;
+                }
+            }
+            if (queueIndex < 0) {
+                return;
+            }
+        }
 
-    m_workerPool.start(QRunnable::create(
-            [this, jobId, request, cancellation] {
-                runJob(jobId, request, cancellation);
-            }));
+        const auto jobId = m_queue.takeAt(queueIndex);
+        auto job = m_jobs.find(jobId);
+        if (job == m_jobs.end() ||
+                job->snapshot.state != StemSeparationState::Queued) {
+            continue;
+        }
+        m_activeJobIds.insert(jobId);
+        job->snapshot.state = StemSeparationState::Preparing;
+        job->snapshot.percentage = 0.0F;
+        job->snapshot.error.clear();
+        ++job->snapshot.attemptCount;
+        const auto request = job->snapshot.request;
+        const auto cancellation = job->pCancellation;
+        saveQueue();
+        notifyJobAndQueue(jobId);
+
+        m_workerPool.start(QRunnable::create(
+                [this, jobId, request, cancellation] {
+                    runJob(jobId, request, cancellation);
+                }));
+    }
 }
 
 void StemSeparationManager::runJob(const QString& jobId,
@@ -514,7 +549,7 @@ void StemSeparationManager::runJob(const QString& jobId,
 void StemSeparationManager::publishState(
         const QString& jobId, StemSeparationState state) {
     auto job = m_jobs.find(jobId);
-    if (job == m_jobs.end() || jobId != m_activeJobId ||
+    if (job == m_jobs.end() || !m_activeJobIds.contains(jobId) ||
             isTerminal(job->snapshot.state)) {
         return;
     }
@@ -536,7 +571,7 @@ void StemSeparationManager::publishState(
 void StemSeparationManager::publishProgress(
         const QString& jobId, float progress) {
     auto job = m_jobs.find(jobId);
-    if (job == m_jobs.end() || jobId != m_activeJobId ||
+    if (job == m_jobs.end() || !m_activeJobIds.contains(jobId) ||
             isTerminal(job->snapshot.state)) {
         return;
     }
@@ -565,10 +600,10 @@ void StemSeparationManager::publishAvailableFrames(
 void StemSeparationManager::workerFinished(const QString& jobId,
         StemSeparationProcessor::Result result) {
     auto job = m_jobs.find(jobId);
-    if (job == m_jobs.end() || jobId != m_activeJobId) {
+    if (job == m_jobs.end() || !m_activeJobIds.contains(jobId)) {
         return;
     }
-    m_activeJobId.clear();
+    m_activeJobIds.remove(jobId);
     const auto cancelled = job->pCancellation->cancelled.load(
             std::memory_order_acquire);
     const auto pauseRequested =
@@ -619,7 +654,7 @@ void StemSeparationManager::notifyJobAndQueue(
 
 int StemSeparationManager::queuePosition(
         const QString& jobId) const {
-    if (jobId == m_activeJobId) {
+    if (m_activeJobIds.contains(jobId)) {
         return 0;
     }
     const auto position = m_queue.indexOf(jobId);

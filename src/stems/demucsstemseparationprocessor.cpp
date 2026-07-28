@@ -54,6 +54,7 @@ DemucsStemSeparationProcessor::~DemucsStemSeparationProcessor() = default;
 
 void DemucsStemSeparationProcessor::setInferenceThreadCount(
         int threadCount) {
+    const std::unique_lock processLock(m_processMutex);
     if (threadCount < 1 ||
             m_settings.inferenceThreadCount == threadCount) {
         return;
@@ -64,6 +65,8 @@ void DemucsStemSeparationProcessor::setInferenceThreadCount(
 
 void DemucsStemSeparationProcessor::discardCached(
         const QString& entryId) {
+    const std::scoped_lock runtimeCacheLock(
+            m_runtimeMutex, m_cacheMutex);
     const auto protectedIds = protectedEntryIds({});
     if (entryId.isEmpty() ||
             protectedIds.contains(entryId)) {
@@ -87,6 +90,7 @@ StemSeparationProcessor::Result
 DemucsStemSeparationProcessor::process(
         const StemSeparationRequest& request,
         const Callbacks& callbacks) {
+    const std::shared_lock processLock(m_processMutex);
     if (callbacks.publishState) {
         callbacks.publishState(StemSeparationState::Preparing);
     }
@@ -114,6 +118,7 @@ DemucsStemSeparationProcessor::process(
     if (!request.liveSessionId.isEmpty()) {
         return processLive(request, callbacks);
     }
+    const std::lock_guard cacheLock(m_cacheMutex);
 
     error.clear();
     if (m_cache.lookup(request.cacheEntryId, &error).has_value()) {
@@ -343,6 +348,8 @@ DemucsStemSeparationProcessor::cancelledOrPaused(
 
 bool DemucsStemSeparationProcessor::prepareRuntime(
         const Callbacks& callbacks, QString* pErrorMessage) {
+    const std::scoped_lock runtimeCacheLock(
+            m_runtimeMutex, m_cacheMutex);
     if (!m_cacheInitialized) {
         if (!m_cache.initialize(pErrorMessage) ||
                 !m_alternateSourceLinker.initialize(

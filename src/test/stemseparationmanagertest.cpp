@@ -40,6 +40,16 @@ StemSeparationRequest request(
     };
 }
 
+StemSeparationRequest liveRequest(const QString& name) {
+    auto result = request(
+            name, StemSeparationPriority::LoadedNotPlaying);
+    result.liveSessionId =
+            (QStringLiteral("live-") + name)
+                    .repeated(64)
+                    .left(64);
+    return result;
+}
+
 class RecordingProcessor final : public StemSeparationProcessor {
   public:
     void setInferenceThreadCount(int threadCount) override {
@@ -129,6 +139,40 @@ class FailingProcessor final : public StemSeparationProcessor {
     }
 };
 
+class ConcurrentLiveProcessor final
+        : public StemSeparationProcessor {
+  public:
+    Result process(const StemSeparationRequest&,
+            const Callbacks& callbacks) override {
+        m_started.fetch_add(1, std::memory_order_acq_rel);
+        const auto active =
+                m_active.fetch_add(
+                        1, std::memory_order_acq_rel) +
+                1;
+        auto maximum = m_maximumActive.load(
+                std::memory_order_acquire);
+        while (active > maximum &&
+                !m_maximumActive.compare_exchange_weak(
+                        maximum,
+                        active,
+                        std::memory_order_acq_rel)) {
+        }
+        while (!m_release.load(std::memory_order_acquire) &&
+                !callbacks.cancelled()) {
+            QThread::msleep(1);
+        }
+        m_active.fetch_sub(1, std::memory_order_acq_rel);
+        return callbacks.cancelled()
+                ? Result{Outcome::Cancelled, {}}
+                : Result{Outcome::Completed, {}};
+    }
+
+    std::atomic_int m_started{0};
+    std::atomic_int m_active{0};
+    std::atomic_int m_maximumActive{0};
+    std::atomic_bool m_release{false};
+};
+
 TEST(StemSeparationManagerTest, DiscardsCacheOnWorker) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());
@@ -203,6 +247,92 @@ TEST(StemSeparationManagerTest, RunsPriorityThenFifoOnOneWorker) {
     EXPECT_EQ(manager.snapshot(next)->state,
             StemSeparationState::Ready);
     EXPECT_FLOAT_EQ(manager.snapshot(next)->percentage, 100.0F);
+}
+
+TEST(StemSeparationManagerTest,
+        RunsTwoLiveDeckPipelinesConcurrently) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    auto processor =
+            std::make_shared<ConcurrentLiveProcessor>();
+    StemSeparationManager manager(
+            directory.filePath(QStringLiteral("queue.json")),
+            processor);
+    QString error;
+    ASSERT_TRUE(manager.initialize(&error))
+            << error.toStdString();
+
+    const auto first = manager.enqueue(
+            liveRequest(QStringLiteral("deck-one")), &error);
+    const auto second = manager.enqueue(
+            liveRequest(QStringLiteral("deck-two")), &error);
+    const auto third = manager.enqueue(
+            liveRequest(QStringLiteral("deck-three")), &error);
+    ASSERT_FALSE(first.isEmpty());
+    ASSERT_FALSE(second.isEmpty());
+    ASSERT_FALSE(third.isEmpty());
+    ASSERT_TRUE(waitUntil([&] {
+        return processor->m_started.load(
+                       std::memory_order_acquire) == 2;
+    }));
+    EXPECT_EQ(manager.activeJobCount(), 2);
+    EXPECT_EQ(processor->m_maximumActive.load(
+                      std::memory_order_acquire),
+            2);
+    EXPECT_EQ(manager.queueSize(), 1);
+
+    processor->m_release.store(
+            true, std::memory_order_release);
+    ASSERT_TRUE(waitUntil([&] {
+        return manager.activeJobCount() == 0 &&
+                processor->m_started.load(
+                        std::memory_order_acquire) == 3;
+    }));
+    EXPECT_EQ(manager.snapshot(first)->state,
+            StemSeparationState::Ready);
+    EXPECT_EQ(manager.snapshot(second)->state,
+            StemSeparationState::Ready);
+    EXPECT_EQ(manager.snapshot(third)->state,
+            StemSeparationState::Ready);
+}
+
+TEST(StemSeparationManagerTest,
+        CancellingOneLiveDeckKeepsTheOtherRunning) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    auto processor =
+            std::make_shared<ConcurrentLiveProcessor>();
+    StemSeparationManager manager(
+            directory.filePath(QStringLiteral("queue.json")),
+            processor);
+    QString error;
+    ASSERT_TRUE(manager.initialize(&error))
+            << error.toStdString();
+
+    const auto first = manager.enqueue(
+            liveRequest(QStringLiteral("cancel-one")), &error);
+    const auto second = manager.enqueue(
+            liveRequest(QStringLiteral("keep-two")), &error);
+    ASSERT_TRUE(waitUntil([&] {
+        return manager.activeJobCount() == 2;
+    }));
+
+    ASSERT_TRUE(manager.cancel(first));
+    ASSERT_TRUE(waitUntil([&] {
+        return manager.activeJobCount() == 1;
+    }));
+    EXPECT_EQ(manager.snapshot(first)->state,
+            StemSeparationState::Cancelled);
+    EXPECT_FALSE(manager.snapshot(second)->state ==
+            StemSeparationState::Cancelled);
+
+    processor->m_release.store(
+            true, std::memory_order_release);
+    ASSERT_TRUE(waitUntil([&] {
+        return manager.activeJobCount() == 0;
+    }));
+    EXPECT_EQ(manager.snapshot(second)->state,
+            StemSeparationState::Ready);
 }
 
 TEST(StemSeparationManagerTest, CancelsActiveJobCooperatively) {

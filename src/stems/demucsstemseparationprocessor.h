@@ -5,6 +5,8 @@
 #include <QString>
 #include <functional>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 
 #include "stems/stemalternatesourcelinker.h"
 #include "stems/stemcache.h"
@@ -16,8 +18,9 @@ class DemucsOnnxRunner;
 
 /// Executes the complete decoder -> HTDemucs -> STEM MP4 -> cache path.
 ///
-/// One instance is owned by StemSeparationManager's single low-priority
-/// worker. It is not thread-safe and never runs on the audio thread.
+/// One instance is shared by StemSeparationManager's low-priority live deck
+/// workers. Runtime setup is synchronized and the ONNX runner serializes the
+/// memory-heavy inference itself. It never runs on the audio thread.
 class DemucsStemSeparationProcessor final
         : public StemSeparationProcessor {
   public:
@@ -57,6 +60,9 @@ class DemucsStemSeparationProcessor final
     StemCache m_cache;
     StemAlternateSourceLinker m_alternateSourceLinker;
     std::unique_ptr<DemucsOnnxRunner> m_pRunner;
+    mutable std::shared_mutex m_processMutex;
+    std::mutex m_runtimeMutex;
+    std::mutex m_cacheMutex;
     bool m_cacheInitialized = false;
     bool m_modelVerified = false;
 };
