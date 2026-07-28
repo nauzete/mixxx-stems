@@ -395,6 +395,9 @@ TEST_F(StemStatusControlProviderTest,
             0.0,
             0.0,
             true);
+    // ControlPotmeter initializes non-persistent ranges at their midpoint.
+    // Model the position of a freshly loaded deck before observing a seek.
+    playPosition.set(0.0);
     FakeDeck deck(group);
     provider.registerDeck(&deck);
     const auto pTrack = Track::newTemporary(sourcePath);

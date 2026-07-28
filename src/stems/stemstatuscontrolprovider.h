@@ -18,6 +18,7 @@
 class BaseTrackPlayer;
 class ControlObject;
 class ControlPotmeter;
+class ControlProxy;
 class ControlPushButton;
 
 namespace mixxx::stems {
