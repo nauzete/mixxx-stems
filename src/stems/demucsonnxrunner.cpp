@@ -56,7 +56,10 @@ OrtCustomThreadHandle createInferenceThread(
 
 void joinInferenceThread(OrtCustomThreadHandle handle) {
     auto* const pThread =
-            reinterpret_cast<std::thread*>(handle);
+            static_cast<std::thread*>(
+                    const_cast<void*>(
+                            static_cast<const void*>(
+                                    handle)));
     if (!pThread) {
         return;
     }
