@@ -8,7 +8,17 @@
 #include <mutex>
 #include <sstream>
 #include <stdexcept>
+#include <thread>
 #include <utility>
+
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#elif defined(__linux__)
+#include <sys/resource.h>
+#endif
 
 namespace mixxx::stems {
 namespace {
@@ -16,6 +26,45 @@ namespace {
 constexpr std::size_t kMinimumSegmentSampleCount = 44100;
 constexpr std::size_t kMaximumSegmentSampleCount =
         DemucsOnnxRunner::kDefaultSegmentSampleCount;
+
+void lowerInferenceThreadPriority() noexcept {
+#if defined(_WIN32)
+    SetThreadPriority(
+            GetCurrentThread(),
+            THREAD_PRIORITY_BELOW_NORMAL);
+#elif defined(__linux__)
+    setpriority(PRIO_PROCESS, 0, 10);
+#endif
+}
+
+OrtCustomThreadHandle createInferenceThread(
+        void*,
+        OrtThreadWorkerFn workLoop,
+        void* pWorkerParameter) {
+    try {
+        auto* const pThread = new std::thread(
+                [workLoop, pWorkerParameter] {
+                    lowerInferenceThreadPriority();
+                    workLoop(pWorkerParameter);
+                });
+        return reinterpret_cast<OrtCustomThreadHandle>(
+                pThread);
+    } catch (...) {
+        return nullptr;
+    }
+}
+
+void joinInferenceThread(OrtCustomThreadHandle handle) {
+    auto* const pThread =
+            reinterpret_cast<std::thread*>(handle);
+    if (!pThread) {
+        return;
+    }
+    if (pThread->joinable()) {
+        pThread->join();
+    }
+    delete pThread;
+}
 
 Ort::SessionOptions makeSessionOptions(int intraOpThreadCount) {
     if (intraOpThreadCount < 1) {
@@ -27,6 +76,13 @@ Ort::SessionOptions makeSessionOptions(int intraOpThreadCount) {
     options.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
     options.SetIntraOpNumThreads(intraOpThreadCount);
     options.SetInterOpNumThreads(1);
+    options.AddConfigEntry(
+            "session.intra_op.allow_spinning", "0");
+    options.AddConfigEntry(
+            "session.inter_op.allow_spinning", "0");
+    options.SetCustomCreateThreadFn(
+            createInferenceThread);
+    options.SetCustomJoinThreadFn(joinInferenceThread);
     // HTDemucs activations dominate memory usage. The CPU arena retains its
     // high-water mark after the first chunk, which kept multiple GiB committed
     // for the lifetime of Mixxx on Windows. Direct allocations release each

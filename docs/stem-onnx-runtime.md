@@ -34,11 +34,21 @@ contract while constructing its session:
 - execution mode: sequential;
 - one inter-op thread and a configurable positive intra-op thread count.
 
-ARM64 disables ONNX Runtime's CPU memory arena. Measurements of the fixed
-2.6-second model on Windows showed the same option reducing the isolated
-inference-process peak from about 1.75 GB to 1.07 GB, with a latency tradeoff.
-Windows keeps the arena enabled for lower time-to-first-chunk. These figures
-are diagnostic comparisons, not Raspberry Pi measurements.
+The CPU memory arena and memory pattern are disabled on all supported
+platforms. Measurements of the fixed 2.6-second model on Windows showed the
+arena change reducing the isolated inference-process peak from about 1.75 GB
+to 1.07 GB, with a latency tradeoff. These figures are diagnostic comparisons,
+not Raspberry Pi measurements.
+
+ONNX worker threads run below normal priority on Windows and at nice level 10
+on Linux. Intra-op and inter-op spinning are disabled, so a live session
+waiting for more playback demand does not keep cores busy. Thread-count
+changes never block an active live job; if stems are already being generated,
+the requested value is applied to the first job started after all active live
+jobs finish. For Raspberry Pi 5, start with one or two threads. Four is
+available for measurement but can reduce UI and audio scheduling headroom.
+Windows exposes up to eight threads, but more inference throughput does not
+necessarily improve interface responsiveness.
 
 A MatMul/Gemm-only dynamic INT8 experiment reduced the 2.6-second model file
 from about 304 MB to 220 MB and preserved the synthetic parity output, but on

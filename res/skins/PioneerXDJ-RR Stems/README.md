@@ -15,6 +15,8 @@ This skin is part of an experimental fork and is not an official Mixxx release.
 - A global ACTIVE STEM selector in the upper-right switches both decks between
   Mute and exclusive Solo behavior.
 - ONNX threads are selectable from 1-8 on Windows and 1-4 on Linux/ARM64.
+- One or two threads are recommended on Raspberry Pi 5; higher values trade UI
+  and audio scheduling headroom for inference throughput.
 - Each lower deck includes an Eject button.
 
 The skin does not perform model inference or file operations.
