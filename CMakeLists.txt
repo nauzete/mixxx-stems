@@ -5552,6 +5552,30 @@ if(MIXXX_STEMS_BUILD)
   set(CPACK_PACKAGE_INSTALL_DIRECTORY "Mixxx Stems")
   set(CPACK_PACKAGE_EXECUTABLES "mixxx;Mixxx Stems")
   set(CPACK_DEBIAN_PACKAGE_NAME "mixxx-stems")
+  # CPack otherwise reuses Mixxx's 2.7.0 for every independently tagged
+  # Stems MSI. Distinct product codes with an identical product version can
+  # corrupt component ownership during upgrades. Encode the Stems release in
+  # the third MSI version field while retaining Mixxx's major/minor fields.
+  if(GIT_DESCRIBE MATCHES "^stems-v([0-9]+)\\.([0-9]+)\\.([0-9]+)$")
+    set(_stems_release_major "${CMAKE_MATCH_1}")
+    set(_stems_release_minor "${CMAKE_MATCH_2}")
+    set(_stems_release_patch "${CMAKE_MATCH_3}")
+    math(
+      EXPR
+      _stems_msi_build
+      "${_stems_release_major} * 10000 + ${_stems_release_minor} * 100 + ${_stems_release_patch}"
+    )
+    if(_stems_msi_build GREATER 65535)
+      message(FATAL_ERROR "Stems release version exceeds the MSI build limit")
+    endif()
+    set(
+      CPACK_PACKAGE_VERSION
+      "${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}.${_stems_msi_build}"
+    )
+    set(CPACK_PACKAGE_VERSION_MAJOR "${CMAKE_PROJECT_VERSION_MAJOR}")
+    set(CPACK_PACKAGE_VERSION_MINOR "${CMAKE_PROJECT_VERSION_MINOR}")
+    set(CPACK_PACKAGE_VERSION_PATCH "${_stems_msi_build}")
+  endif()
 else()
   set(CPACK_PACKAGE_NAME "Mixxx")
   set(CPACK_PACKAGE_VENDOR "Mixxx Project")

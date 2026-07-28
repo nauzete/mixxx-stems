@@ -205,7 +205,7 @@ jobs:
         shell: pwsh
         run: |
           Push-Location build
-          cpack -G WIX -V
+          cpack -G WIX -V -D "CPACK_COMPONENTS_ALL=Unspecified;applocal"
           $cpackExitCode = $LASTEXITCODE
           Pop-Location
           if ($cpackExitCode -ne 0) {
@@ -256,6 +256,72 @@ jobs:
           }
           if (!(Get-ChildItem $adminImage -Recurse -Filter onnxruntime.dll)) {
             throw "MSI does not contain onnxruntime.dll"
+          }
+          if (!(Get-ChildItem $adminImage -Recurse -Filter mixxx.exe)) {
+            throw "MSI does not contain mixxx.exe"
+          }
+          if (Get-ChildItem $adminImage -Recurse -Filter mixxx.pdb) {
+            throw "Release MSI unexpectedly contains mixxx.pdb"
+          }
+
+          if ("${{ github.ref }}" -like "refs/tags/stems-v*") {
+            $tagVersion = "${{ github.ref_name }}".Substring(7).Split(".")
+            if ($tagVersion.Count -ne 3) {
+              throw "Invalid Stems release tag"
+            }
+            $expectedMsiBuild =
+              [int]$tagVersion[0] * 10000 +
+              [int]$tagVersion[1] * 100 +
+              [int]$tagVersion[2]
+            $installer = New-Object -ComObject WindowsInstaller.Installer
+            $database = $installer.GetType().InvokeMember(
+              "OpenDatabase",
+              "InvokeMethod",
+              $null,
+              $installer,
+              @($msi, 0)
+            )
+            $view = $database.GetType().InvokeMember(
+              "OpenView",
+              "InvokeMethod",
+              $null,
+              $database,
+              @(
+                "SELECT ``Value`` FROM ``Property`` " +
+                "WHERE ``Property``='ProductVersion'"
+              )
+            )
+            $view.GetType().InvokeMember(
+              "Execute", "InvokeMethod", $null, $view, $null
+            ) | Out-Null
+            $record = $view.GetType().InvokeMember(
+              "Fetch", "InvokeMethod", $null, $view, $null
+            )
+            $productVersion = $record.GetType().InvokeMember(
+              "StringData", "GetProperty", $null, $record, 1
+            )
+            if ($productVersion -ne "2.7.$expectedMsiBuild") {
+              throw "Unexpected MSI ProductVersion: $productVersion"
+            }
+          }
+
+          $installedExe = "$env:ProgramFiles\Mixxx Stems\mixxx.exe"
+          $install = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @(
+            "/i", $msi, "/qn", "/norestart"
+          )
+          if ($install.ExitCode -ne 0) {
+            throw "MSI clean install failed: $($install.ExitCode)"
+          }
+          try {
+            if (!(Test-Path $installedExe)) {
+              throw "A normal MSI installation did not install mixxx.exe"
+            }
+          } finally {
+            $uninstall = Start-Process msiexec.exe -Wait -PassThru `
+              -ArgumentList @("/x", $msi, "/qn", "/norestart")
+            if ($uninstall.ExitCode -ne 0) {
+              throw "MSI cleanup failed: $($uninstall.ExitCode)"
+            }
           }
 
           foreach ($file in @($msi, $zip)) {
