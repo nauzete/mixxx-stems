@@ -795,6 +795,16 @@ void StemStatusControlProvider::trackLoading(
                         ? pOldLiveSessionTrack
                         : pOldTrack);
     }
+    // Start live separation before the engine finishes opening the alternate
+    // .stemlive source. Waiting for newTrackLoaded here can deadlock a second
+    // deck behind the active job: the reader waits for its first chunk while
+    // the job that would produce that chunk has not yet been enqueued.
+    if (pNewTrack &&
+            pDeckState->pCacheStatus->get() !=
+                    static_cast<double>(CacheStatus::Ready)) {
+        trigger(group,
+                StemSeparationPriority::LoadedNotPlaying);
+    }
     if (!pOldTrack || !m_pManager) {
         return;
     }
