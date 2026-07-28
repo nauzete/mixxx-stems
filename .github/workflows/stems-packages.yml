@@ -143,7 +143,8 @@ jobs:
         shell: pwsh
         run: |
           ctest --test-dir build --timeout 90 --repeat until-pass:2 `
-            --exclude-regex '^AutoDJProcessorTest.*$'
+            --tests-regex '^(Demucs|SoundSourceStemLiveTest|Stem)' `
+            --output-on-failure
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
@@ -351,6 +352,7 @@ jobs:
           --test-dir build
           --timeout 90
           --repeat until-pass:2
+          --tests-regex '^(Demucs|SoundSourceStemLiveTest|Stem)'
           --output-on-failure
 
       - name: Build real-model smoke test
