@@ -3,6 +3,7 @@
 #include <QByteArray>
 #include <QSet>
 #include <QString>
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -52,6 +53,7 @@ class DemucsStemSeparationProcessor final
             const Callbacks& callbacks);
     bool prepareRuntime(
             const Callbacks& callbacks, QString* pErrorMessage);
+    void applyPendingInferenceThreadCount();
     QSet<QString> protectedEntryIds(
             const QString& activeEntryId) const;
 
@@ -60,6 +62,7 @@ class DemucsStemSeparationProcessor final
     StemCache m_cache;
     StemAlternateSourceLinker m_alternateSourceLinker;
     std::unique_ptr<DemucsOnnxRunner> m_pRunner;
+    std::atomic_int m_pendingInferenceThreadCount;
     mutable std::shared_mutex m_processMutex;
     std::mutex m_runtimeMutex;
     std::mutex m_cacheMutex;

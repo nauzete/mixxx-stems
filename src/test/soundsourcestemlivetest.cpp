@@ -20,6 +20,30 @@ class SoundSourceStemLiveTest
 };
 
 TEST_F(SoundSourceStemLiveTest,
+        LiveDemandOnlyMovesForward) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto pTrack = Track::newTemporary(
+            getTestDir().filePath(
+                    QStringLiteral("sine-30.wav")));
+    auto pLiveSession =
+            stems::StemLiveSessionRegistry::acquire(
+                    directory.path(), pTrack);
+    ASSERT_TRUE(pLiveSession);
+
+    EXPECT_EQ(pLiveSession->requestedFrameCount(), 0U);
+    pLiveSession->requestThrough(44100);
+    EXPECT_EQ(pLiveSession->requestedFrameCount(), 44100U);
+    pLiveSession->requestThrough(22050);
+    EXPECT_EQ(pLiveSession->requestedFrameCount(), 44100U);
+    pLiveSession->requestThrough(88200);
+    EXPECT_EQ(pLiveSession->requestedFrameCount(), 88200U);
+
+    stems::StemLiveSessionRegistry::release(
+            pLiveSession->id(), pTrack);
+}
+
+TEST_F(SoundSourceStemLiveTest,
         ReadsPublishedPcmAsEightChannels) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());

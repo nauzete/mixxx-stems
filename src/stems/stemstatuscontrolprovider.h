@@ -91,6 +91,7 @@ class StemStatusControlProvider final : public QObject {
         std::unique_ptr<ControlObject> pCacheStatus;
         std::unique_ptr<ControlObject> pLiveReady;
         std::unique_ptr<ControlObject> pError;
+        std::unique_ptr<ControlProxy> pPlayPosition;
     };
 
     std::shared_ptr<DeckState> deckState(
@@ -130,6 +131,8 @@ class StemStatusControlProvider final : public QObject {
     void updateWorkerState();
     void updateCacheSize();
     void refreshProtectedEntryIds();
+    void requestLiveBuffer(
+            const DeckState* pDeckState, double playPosition);
     bool modelReady() const;
     static double errorCodeForMessage(const QString& error);
 

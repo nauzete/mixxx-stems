@@ -9,9 +9,11 @@
 #include <atomic>
 #include <functional>
 
+#include "control/controllinpotmeter.h"
 #include "control/controlobject.h"
 #include "control/controlproxy.h"
 #include "mixer/basetrackplayer.h"
+#include "stems/stemlivesessionregistry.h"
 #include "stems/stemstatuscontrolprovider.h"
 #include "test/mixxxtest.h"
 #include "track/track.h"
@@ -367,6 +369,55 @@ TEST_F(StemStatusControlProviderTest,
             1.0);
     EXPECT_EQ(secondDeck.publishedStemFrameCount(), 44100);
     EXPECT_EQ(secondDeck.loadCount(), 1);
+}
+
+TEST_F(StemStatusControlProviderTest,
+        LiveDemandTracksDeckPlayPosition) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto sourcePath = createSourceFile(&directory);
+    auto pProcessor = std::make_shared<CancellableProcessor>();
+    StemStatusControlProvider provider(
+            {
+                    directory.filePath(QStringLiteral("service")),
+                    {},
+                    2,
+                    128000,
+                    false,
+            },
+            pProcessor);
+    ASSERT_TRUE(provider.initialize());
+    const auto group = QStringLiteral("[Channel76]");
+    ControlLinPotmeter playPosition(
+            ConfigKey(group, QStringLiteral("playposition")),
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            true);
+    FakeDeck deck(group);
+    provider.registerDeck(&deck);
+    const auto pTrack = Track::newTemporary(sourcePath);
+    pTrack->setDuration(90.0);
+    deck.slotLoadTrack(pTrack, {}, false);
+
+    const auto sessionId =
+            QFileInfo(deck.lastAlternateUrl().toLocalFile())
+                    .completeBaseName();
+    const auto pLiveSession =
+            StemLiveSessionRegistry::find(sessionId);
+    ASSERT_TRUE(pLiveSession);
+    constexpr std::size_t kSampleRate = 44100;
+    EXPECT_EQ(pLiveSession->requestedFrameCount(),
+            10 * kSampleRate);
+
+    playPosition.set(0.5);
+    ASSERT_TRUE(waitUntil([&] {
+        return pLiveSession->requestedFrameCount() ==
+                55 * kSampleRate;
+    }));
+
+    deck.slotEjectTrack(1.0);
 }
 
 TEST_F(StemStatusControlProviderTest,

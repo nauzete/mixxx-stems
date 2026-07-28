@@ -135,6 +135,24 @@ void StemLiveSession::detachTrack(
     m_attachedTracks.erase(attachedTrack);
 }
 
+void StemLiveSession::requestThrough(
+        std::size_t frameCount) noexcept {
+    auto requested = m_requestedFrameCount.load(
+            std::memory_order_relaxed);
+    while (requested < frameCount &&
+            !m_requestedFrameCount.compare_exchange_weak(
+                    requested,
+                    frameCount,
+                    std::memory_order_release,
+                    std::memory_order_relaxed)) {
+    }
+}
+
+std::size_t StemLiveSession::requestedFrameCount() const noexcept {
+    return m_requestedFrameCount.load(
+            std::memory_order_acquire);
+}
+
 std::shared_ptr<StemLiveSession>
 StemLiveSessionRegistry::acquire(
         const QString& temporaryDirectoryPath,

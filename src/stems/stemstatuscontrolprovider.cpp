@@ -12,6 +12,7 @@
 
 #include "control/controlobject.h"
 #include "control/controlpotmeter.h"
+#include "control/controlproxy.h"
 #include "control/controlpushbutton.h"
 #include "mixer/basetrackplayer.h"
 #include "moc_stemstatuscontrolprovider.cpp"
@@ -30,6 +31,11 @@ const QString kModelDirectoryName = QStringLiteral("model");
 const QString kCacheDirectoryName = QStringLiteral("cache");
 const QString kLiveDirectoryName = QStringLiteral("live");
 const QString kQueueFileName = QStringLiteral("queue.json");
+constexpr std::size_t kStemSampleRate = 44100;
+constexpr std::size_t kInitialBufferFrameCount =
+        10 * kStemSampleRate;
+constexpr std::size_t kLookAheadFrameCount =
+        10 * kStemSampleRate;
 
 std::unique_ptr<ControlObject> readOnlyControl(
         const QString& group,
@@ -108,6 +114,10 @@ StemStatusControlProvider::StemStatusControlProvider(
                             maximumThreadCount)));
     m_pInferenceThreads->setStepCount(
             std::max(1, maximumThreadCount - 1));
+    m_settings.inferenceThreadCount =
+            std::max(1,
+                    static_cast<int>(std::lround(
+                            m_pInferenceThreads->get())));
 
     connect(m_pEnabled.get(),
             &ControlObject::valueChanged,
@@ -338,6 +348,12 @@ void StemStatusControlProvider::registerDeck(
             group, QStringLiteral("stem_live_ready"));
     pDeckState->pError = readOnlyControl(
             group, QStringLiteral("separation_error"));
+    pDeckState->pPlayPosition =
+            std::make_unique<ControlProxy>(
+                    group,
+                    QStringLiteral("playposition"),
+                    this,
+                    ControlFlag::AllowMissingOrInvalid);
     m_decks.insert(group, pDeckState);
     const ConfigKey activeModeKey(
             group, QStringLiteral("stem_active_mode"));
@@ -363,6 +379,16 @@ void StemStatusControlProvider::registerDeck(
                     cancel(group);
                 }
             });
+    pDeckState->pPlayPosition->connectValueChanged(
+            this,
+            [this, group](double playPosition) {
+                const auto pDeckState = deckState(group);
+                if (pDeckState) {
+                    requestLiveBuffer(
+                            pDeckState.get(), playPosition);
+                }
+            },
+            Qt::QueuedConnection);
     connect(pDeck,
             &BaseTrackPlayer::loadingTrack,
             this,
@@ -744,6 +770,9 @@ QUrl StemStatusControlProvider::resolveForDeck(
     pDeckState->liveSessionId =
             pLiveSession->id();
     pDeckState->pLiveSessionTrack = pTrack;
+    // The engine may still expose the previous track's play position while
+    // its alternate source is being resolved.
+    requestLiveBuffer(pDeckState.get(), 0.0);
     return pLiveSession->url();
 }
 
@@ -1023,6 +1052,43 @@ void StemStatusControlProvider::refreshProtectedEntryIds() {
     }
     const QMutexLocker locker(&m_protectedEntryIdsMutex);
     m_protectedEntryIds = std::move(protectedIds);
+}
+
+void StemStatusControlProvider::requestLiveBuffer(
+        const DeckState* pDeckState,
+        double playPosition) {
+    if (!pDeckState ||
+            pDeckState->liveSessionId.isEmpty() ||
+            !pDeckState->pLiveSessionTrack) {
+        return;
+    }
+    const auto pLiveSession =
+            StemLiveSessionRegistry::find(
+                    pDeckState->liveSessionId);
+    if (!pLiveSession) {
+        return;
+    }
+    const auto totalFrameCount =
+            static_cast<std::size_t>(std::max(
+                    0.0,
+                    pDeckState->pLiveSessionTrack
+                                    ->getDuration() *
+                            static_cast<double>(
+                                    kStemSampleRate)));
+    if (totalFrameCount == 0) {
+        pLiveSession->requestThrough(
+                kInitialBufferFrameCount);
+        return;
+    }
+    const auto currentFrame =
+            static_cast<std::size_t>(
+                    std::clamp(playPosition, 0.0, 1.0) *
+                    static_cast<double>(totalFrameCount));
+    pLiveSession->requestThrough(
+            std::min(totalFrameCount,
+                    std::max(kInitialBufferFrameCount,
+                            currentFrame +
+                                    kLookAheadFrameCount)));
 }
 
 bool StemStatusControlProvider::modelReady() const {

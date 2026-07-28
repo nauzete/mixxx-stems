@@ -68,7 +68,8 @@ StemChunkPipeline::Result StemChunkPipeline::run(
         const ReadCallback& read,
         const WriteCallback& write,
         const ProgressCallback& progress,
-        const CancelCallback& cancelled) {
+        const CancelCallback& cancelled,
+        const DemandCallback& awaitDemand) {
     if (totalFrameCount == 0) {
         reportProgress(progress, 1.0F);
         return Result::Completed;
@@ -88,6 +89,10 @@ StemChunkPipeline::Result StemChunkPipeline::run(
     for (std::size_t segmentIndex = 0; segmentIndex < segmentCount;
             ++segmentIndex) {
         if (isCancelled(cancelled)) {
+            return Result::Cancelled;
+        }
+        if (awaitDemand &&
+                !awaitDemand(emittedFrameCount)) {
             return Result::Cancelled;
         }
 

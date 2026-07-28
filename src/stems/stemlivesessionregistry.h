@@ -3,6 +3,8 @@
 #include <QMutex>
 #include <QString>
 #include <QUrl>
+#include <atomic>
+#include <cstddef>
 #include <memory>
 #include <vector>
 
@@ -35,6 +37,8 @@ class StemLiveSession final {
     temporarySession() const;
     void attachTrack(const TrackPointer& pTrack);
     void detachTrack(const TrackPointer& pTrack);
+    void requestThrough(std::size_t frameCount) noexcept;
+    std::size_t requestedFrameCount() const noexcept;
 
   private:
     struct AttachedTrack {
@@ -49,6 +53,7 @@ class StemLiveSession final {
     mutable QMutex m_mutex;
     std::shared_ptr<StemTemporarySession> m_pTemporarySession;
     std::vector<AttachedTrack> m_attachedTracks;
+    std::atomic_size_t m_requestedFrameCount{0};
 };
 
 /// Process-local registry connecting generated chunks to SoundSourceStemLive.

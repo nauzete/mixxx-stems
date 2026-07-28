@@ -44,8 +44,10 @@ text for these numeric values.
 Changing or ejecting the loaded track resets all per-deck values. The live
 alternate source is installed during the initial load. It serves a unity-sum
 original-track fallback until each generated range is flushed, then
-`CachingReader` replaces only the affected cached blocks. The last deck eject
-also cancels the job and removes its temporary stems.
+`CachingReader` replaces only the affected cached blocks. Generation starts
+with a 10-second target and stays 10 seconds ahead of `playposition`; it does
+not process the complete track merely because an analyzer reads ahead. The
+last deck eject also cancels the job and removes its temporary stems.
 
 ## Global controls
 
@@ -60,7 +62,7 @@ also cancels the job and removes its temporary stems.
 | `[StemSeparation],model_available` | read | 0–1 | 0 | Pinned manifest and model passed SHA-256 verification |
 | `[StemSeparation],model_download_progress` | read | 0–100 | 0 | Streaming model download progress |
 | `[StemSeparation],active_mode` | read/write | 0–1 | 0 | Global Mute/Solo mode propagated to all registered decks |
-| `[StemSeparation],inference_threads` | read/write, persistent | platform range | configured default | ONNX intra-op threads; Windows 1–8, Linux/ARM64 1–4 |
+| `[StemSeparation],inference_threads` | read/write, persistent | platform range | configured default | ONNX intra-op threads; Windows 1–8, Linux/ARM64 1–4; changes apply after active live jobs finish |
 
 Worker state values are `0` idle, `1` active, `2` paused, `3` unavailable, and
 `4` downloading.

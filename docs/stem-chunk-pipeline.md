@@ -63,6 +63,14 @@ blocks without inference, allocation, locking, or file I/O on the audio
 thread. The temporary source is removed after the final deck using the track
 is ejected.
 
+The live pipeline waits between inference calls when it has generated the
+requested range. A deck load requests the first 10 seconds, and
+`playposition` advances a monotonic target to 10 seconds beyond the current
+position. Reads by analyzers cannot accidentally request the complete track.
+Seeking forward requests all preceding sequential chunks because the
+temporary PCM source is append-only; sparse random-access generation is not
+implemented.
+
 Cancellation is checked before every inference, after every inference, and
 before output is committed. A cancelled run stops without emitting further
 chunks.

@@ -43,10 +43,14 @@ The pinned model is downloaded from the
 The model is not stored in Git.
 
 The automatic live path writes interleaved eight-channel PCM16 to disk as each
-stride completes. It never retains complete float32 stems in RAM and removes
-the temporary file when the last deck using the track is ejected. A 512 MiB
-guard prevents unbounded temporary output. The existing offline cache path can
-still publish an AAC-LC five-stream MP4 atomically.
+stride completes. It initially requests 10 seconds and then follows each
+deck's playback position with a 10-second look-ahead instead of separating the
+whole track immediately. Both decks share the same model session, while their
+chunk requests are served fairly by the serialized runner. It never retains
+complete float32 stems in RAM and removes the temporary file when the last deck
+using the track is ejected. A 512 MiB guard prevents unbounded temporary
+output. The existing offline cache path can still publish an AAC-LC
+five-stream MP4 atomically.
 
 See the component documents in this directory for cache, queue, container,
 library-linking, controls, model, packaging, and benchmark details.

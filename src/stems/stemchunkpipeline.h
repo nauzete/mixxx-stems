@@ -48,6 +48,10 @@ class StemChunkPipeline final {
 
     using ProgressCallback = std::function<void(float progress)>;
     using CancelCallback = std::function<bool()>;
+    /// Blocks in the background worker until another chunk is requested.
+    /// Returns false when processing should stop.
+    using DemandCallback =
+            std::function<bool(std::size_t emittedFrameCount)>;
 
     explicit StemChunkPipeline(const StemInferenceRunner& runner);
 
@@ -58,7 +62,8 @@ class StemChunkPipeline final {
             const ReadCallback& read,
             const WriteCallback& write,
             const ProgressCallback& progress = {},
-            const CancelCallback& cancelled = {});
+            const CancelCallback& cancelled = {},
+            const DemandCallback& awaitDemand = {});
 
     std::size_t allocatedSampleCapacity() const noexcept;
 

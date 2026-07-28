@@ -159,6 +159,44 @@ TEST(StemChunkPipelineTest, CancelsBeforeInference) {
     EXPECT_EQ(runner.m_runCount, 0U);
 }
 
+TEST(StemChunkPipelineTest, WaitsForDemandBeforeNextInference) {
+    const auto frameCount =
+            StemChunkPipeline::kStrideSampleCount * 2 + 1;
+    const auto input = makeStereo(frameCount);
+    IdentityRunner runner;
+    StemChunkPipeline pipeline(runner);
+    std::size_t writtenFrameCount = 0;
+    std::vector<std::size_t> demandOffsets;
+
+    const auto result = pipeline.run(
+            frameCount,
+            [&](std::size_t offset, std::span<float> destination) {
+                std::copy_n(input.begin() + offset * kChannelCount,
+                        destination.size(),
+                        destination.begin());
+            },
+            [&](std::size_t,
+                    std::size_t writeFrameCount,
+                    std::span<const float>) {
+                writtenFrameCount += writeFrameCount;
+            },
+            {},
+            {},
+            [&](std::size_t emittedFrameCount) {
+                demandOffsets.push_back(emittedFrameCount);
+                return demandOffsets.size() == 1;
+            });
+
+    EXPECT_EQ(result, StemChunkPipeline::Result::Cancelled);
+    EXPECT_EQ(runner.m_runCount, 1U);
+    EXPECT_EQ(writtenFrameCount,
+            StemChunkPipeline::kStrideSampleCount);
+    ASSERT_EQ(demandOffsets.size(), 2U);
+    EXPECT_EQ(demandOffsets[0], 0U);
+    EXPECT_EQ(demandOffsets[1],
+            StemChunkPipeline::kStrideSampleCount);
+}
+
 TEST(StemChunkPipelineTest, EmptyInputCompletesWithoutCallbacks) {
     IdentityRunner runner;
     StemChunkPipeline pipeline(runner);

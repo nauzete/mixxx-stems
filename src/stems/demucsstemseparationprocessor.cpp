@@ -4,6 +4,7 @@
 #include <QCryptographicHash>
 #include <QFile>
 #include <QFileInfo>
+#include <QThread>
 #include <filesystem>
 #include <stdexcept>
 #include <utility>
@@ -47,20 +48,21 @@ DemucsStemSeparationProcessor::DemucsStemSeparationProcessor(
           m_cache(m_settings.cacheDirectoryPath,
                   m_settings.cacheLimits),
           m_alternateSourceLinker(
-                  m_settings.cacheDirectoryPath) {
+                  m_settings.cacheDirectoryPath),
+          m_pendingInferenceThreadCount(
+                  m_settings.inferenceThreadCount) {
 }
 
 DemucsStemSeparationProcessor::~DemucsStemSeparationProcessor() = default;
 
 void DemucsStemSeparationProcessor::setInferenceThreadCount(
         int threadCount) {
-    const std::unique_lock processLock(m_processMutex);
-    if (threadCount < 1 ||
-            m_settings.inferenceThreadCount == threadCount) {
+    if (threadCount < 1) {
         return;
     }
-    m_settings.inferenceThreadCount = threadCount;
-    m_pRunner.reset();
+    m_pendingInferenceThreadCount.store(
+            threadCount, std::memory_order_relaxed);
+    applyPendingInferenceThreadCount();
 }
 
 void DemucsStemSeparationProcessor::discardCached(
@@ -90,6 +92,7 @@ StemSeparationProcessor::Result
 DemucsStemSeparationProcessor::process(
         const StemSeparationRequest& request,
         const Callbacks& callbacks) {
+    applyPendingInferenceThreadCount();
     const std::shared_lock processLock(m_processMutex);
     if (callbacks.publishState) {
         callbacks.publishState(StemSeparationState::Preparing);
@@ -252,6 +255,26 @@ DemucsStemSeparationProcessor::process(
     }
 }
 
+void DemucsStemSeparationProcessor::
+        applyPendingInferenceThreadCount() {
+    const std::unique_lock processLock(
+            m_processMutex, std::try_to_lock);
+    if (!processLock.owns_lock()) {
+        // Live jobs may wait for demand while keeping the current session
+        // alive. Defer the change instead of blocking a maintenance worker;
+        // the next job applies it before acquiring the shared process lock.
+        return;
+    }
+    const auto threadCount =
+            m_pendingInferenceThreadCount.load(
+                    std::memory_order_relaxed);
+    if (m_settings.inferenceThreadCount == threadCount) {
+        return;
+    }
+    m_settings.inferenceThreadCount = threadCount;
+    m_pRunner.reset();
+}
+
 StemSeparationProcessor::Result
 DemucsStemSeparationProcessor::processLive(
         const StemSeparationRequest& request,
@@ -308,7 +331,17 @@ DemucsStemSeparationProcessor::processLive(
                     }
                 },
                 callbacks.publishProgress,
-                [&] { return stopped(callbacks); });
+                [&] { return stopped(callbacks); },
+                [&](std::size_t emittedFrameCount) {
+                    while (pLiveSession->requestedFrameCount() <=
+                            emittedFrameCount) {
+                        if (stopped(callbacks)) {
+                            return false;
+                        }
+                        QThread::msleep(20);
+                    }
+                    return true;
+                });
         if (result == StemChunkPipeline::Result::Cancelled ||
                 stopped(callbacks)) {
             store.remove();
