@@ -66,6 +66,13 @@ EngineDeck::EngineDeck(
 
     m_pStemCount = std::make_unique<ControlObject>(ConfigKey(getGroup(), "stem_count"));
     m_pStemCount->setReadOnly();
+    m_pStemLiveReady = std::make_unique<ControlObject>(
+            ConfigKey(getGroup(), QStringLiteral("stem_live_ready")),
+            true,
+            false,
+            false,
+            1.0);
+    m_pStemLiveReady->setReadOnly();
     m_pStemActiveMode = std::make_unique<ControlPushButton>(
             ConfigKey(getGroup(), QStringLiteral("stem_active_mode")),
             true,
@@ -176,6 +183,22 @@ void EngineDeck::processStem(CSAMPLE* pOut, const std::size_t bufferSize) {
     m_pBuffer->process(m_stemBuffer.data(), allChannelBufferSize);
 
     CSAMPLE* pIn = m_stemBuffer.data();
+
+    // A progressive source contains a unity-sum copy of the original track
+    // until the frames around the current play position have been separated.
+    // Do not apply stem mute/solo to that fallback: doing so would expose
+    // copies of the original mix as if they were isolated stems. The
+    // readiness ControlObject is lock-free to read from the audio thread and
+    // the normal channel DSP below becomes active as soon as the hot chunk is
+    // published.
+    if (!m_pStemLiveReady->toBool()) {
+        SampleUtil::mixMultichannelToStereo(
+                pOut, pIn, numFrames, chCount);
+        std::fill(m_stemsGainCache.begin(),
+                m_stemsGainCache.end(),
+                CSAMPLE_GAIN_ONE);
+        return;
+    }
 
     // TODO(XXX): process stem DSP
 

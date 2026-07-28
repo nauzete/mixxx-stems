@@ -36,6 +36,8 @@ constexpr std::size_t kInitialBufferFrameCount =
         10 * kStemSampleRate;
 constexpr std::size_t kLookAheadFrameCount =
         10 * kStemSampleRate;
+constexpr std::size_t kLiveReadyGuardFrameCount =
+        kStemSampleRate;
 
 std::unique_ptr<ControlObject> readOnlyControl(
         const QString& group,
@@ -284,12 +286,20 @@ bool StemStatusControlProvider::initialize(
                 }
                 for (const auto& pDeckState : m_decks) {
                     if (pDeckState->jobId == jobId) {
-                        pDeckState->pLiveReady
-                                ->setAndConfirm(1.0);
+                        pDeckState->liveReadyFrameCount =
+                                static_cast<std::size_t>(
+                                        readyFrameCount);
                         pDeckState->pDeck
                                 ->publishStemFramesAvailable(
                                         static_cast<SINT>(
                                                 readyFrameCount));
+                        requestLiveBuffer(
+                                pDeckState.get(),
+                                pDeckState->pPlayPosition
+                                        ? pDeckState
+                                                  ->pPlayPosition
+                                                  ->get()
+                                        : 0.0);
                     }
                 }
             });
@@ -344,8 +354,17 @@ void StemStatusControlProvider::registerDeck(
             group, QStringLiteral("separation_queue_position"), -1.0);
     pDeckState->pCacheStatus = readOnlyControl(
             group, QStringLiteral("stem_cache_status"));
-    pDeckState->pLiveReady = readOnlyControl(
+    const ConfigKey liveReadyKey(
             group, QStringLiteral("stem_live_ready"));
+    pDeckState->pLiveReady = ControlObject::getControl(
+            liveReadyKey, ControlFlag::NoWarnIfMissing);
+    if (!pDeckState->pLiveReady) {
+        pDeckState->pOwnedLiveReady = readOnlyControl(
+                group, QStringLiteral("stem_live_ready"));
+        pDeckState->pLiveReady =
+                pDeckState->pOwnedLiveReady.get();
+    }
+    pDeckState->pLiveReady->setAndConfirm(0.0);
     pDeckState->pError = readOnlyControl(
             group, QStringLiteral("separation_error"));
     pDeckState->pPlayPosition =
@@ -494,11 +513,19 @@ void StemStatusControlProvider::trigger(
                     pTemporarySession->readyFrameCount.load(
                             std::memory_order_acquire);
             if (readyFrameCount > 0) {
-                pDeckState->pLiveReady->setAndConfirm(1.0);
+                pDeckState->liveReadyFrameCount =
+                        readyFrameCount;
                 pDeckState->pDeck
                         ->publishStemFramesAvailable(
                                 static_cast<SINT>(
                                         readyFrameCount));
+                requestLiveBuffer(
+                        pDeckState.get(),
+                        pDeckState->pPlayPosition
+                                ? pDeckState
+                                          ->pPlayPosition
+                                          ->get()
+                                : 0.0);
             }
             if (pTemporarySession->complete.load(
                         std::memory_order_acquire)) {
@@ -979,6 +1006,7 @@ void StemStatusControlProvider::resetDeck(
     pDeckState->pQueuePosition->setAndConfirm(-1.0);
     pDeckState->pCacheStatus->setAndConfirm(
             static_cast<double>(CacheStatus::None));
+    pDeckState->liveReadyFrameCount = 0;
     pDeckState->pLiveReady->setAndConfirm(0.0);
     pDeckState->pError->setAndConfirm(
             static_cast<double>(ErrorCode::None));
@@ -1055,7 +1083,7 @@ void StemStatusControlProvider::refreshProtectedEntryIds() {
 }
 
 void StemStatusControlProvider::requestLiveBuffer(
-        const DeckState* pDeckState,
+        DeckState* pDeckState,
         double playPosition) {
     if (!pDeckState ||
             pDeckState->liveSessionId.isEmpty() ||
@@ -1066,7 +1094,16 @@ void StemStatusControlProvider::requestLiveBuffer(
             StemLiveSessionRegistry::find(
                     pDeckState->liveSessionId);
     if (!pLiveSession) {
+        pDeckState->pLiveReady->setAndConfirm(0.0);
         return;
+    }
+    const auto pTemporarySession =
+            pLiveSession->temporarySession();
+    if (pTemporarySession) {
+        pDeckState->liveReadyFrameCount = std::max(
+                pDeckState->liveReadyFrameCount,
+                pTemporarySession->readyFrameCount.load(
+                        std::memory_order_acquire));
     }
     const auto totalFrameCount =
             static_cast<std::size_t>(std::max(
@@ -1076,6 +1113,10 @@ void StemStatusControlProvider::requestLiveBuffer(
                             static_cast<double>(
                                     kStemSampleRate)));
     if (totalFrameCount == 0) {
+        pDeckState->pLiveReady->setAndConfirm(
+                pDeckState->liveReadyFrameCount > 0
+                        ? 1.0
+                        : 0.0);
         pLiveSession->requestThrough(
                 kInitialBufferFrameCount);
         return;
@@ -1084,6 +1125,15 @@ void StemStatusControlProvider::requestLiveBuffer(
             static_cast<std::size_t>(
                     std::clamp(playPosition, 0.0, 1.0) *
                     static_cast<double>(totalFrameCount));
+    const auto requiredReadyFrameCount =
+            std::min(totalFrameCount,
+                    currentFrame +
+                            kLiveReadyGuardFrameCount);
+    pDeckState->pLiveReady->setAndConfirm(
+            pDeckState->liveReadyFrameCount >=
+                            requiredReadyFrameCount
+                    ? 1.0
+                    : 0.0);
     pLiveSession->requestThrough(
             std::min(totalFrameCount,
                     std::max(kInitialBufferFrameCount,

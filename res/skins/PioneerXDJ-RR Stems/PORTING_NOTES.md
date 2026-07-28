@@ -13,7 +13,9 @@ This is a derivative of the supplied PioneerXDJ-RR skin. The original license an
 - Independent `[ChannelX_StemN],solo` controls preserve mute state.
 - A global-looking Mute/Solo selector updates both deck mode controls.
 - Pads remain disabled and gray until
-  `[ChannelX],stem_live_ready` reports the first published chunk.
+  `[ChannelX],stem_live_ready` reports separated audio around the current
+  playback position. Seeking beyond the generated range disables stem
+  mute/solo until the hot buffer catches up.
 - Per-deck eject controls use the existing `[ChannelX],eject` API.
 
 ## Control contract

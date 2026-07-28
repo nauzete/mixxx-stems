@@ -424,6 +424,58 @@ TEST_F(StemStatusControlProviderTest,
 }
 
 TEST_F(StemStatusControlProviderTest,
+        LiveControlsFollowTheGeneratedPlaybackRange) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto sourcePath = createSourceFile(&directory);
+    auto pProcessor = std::make_shared<SuccessfulProcessor>();
+    StemStatusControlProvider provider(
+            {
+                    directory.filePath(QStringLiteral("service")),
+                    {},
+                    2,
+                    128000,
+                    false,
+            },
+            pProcessor);
+    ASSERT_TRUE(provider.initialize());
+    const auto group = QStringLiteral("[Channel77]");
+    ControlLinPotmeter playPosition(
+            ConfigKey(group, QStringLiteral("playposition")),
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            true);
+    playPosition.set(0.0);
+    FakeDeck deck(group);
+    provider.registerDeck(&deck);
+    const auto pTrack = Track::newTemporary(sourcePath);
+    pTrack->setDuration(90.0);
+    deck.slotLoadTrack(pTrack, {}, false);
+
+    ASSERT_TRUE(waitUntil([&] {
+        return controlValue(group,
+                       QStringLiteral("stem_live_ready")) ==
+                1.0;
+    }));
+    playPosition.set(0.5);
+    ASSERT_TRUE(waitUntil([&] {
+        return controlValue(group,
+                       QStringLiteral("stem_live_ready")) ==
+                0.0;
+    }));
+    playPosition.set(0.0);
+    ASSERT_TRUE(waitUntil([&] {
+        return controlValue(group,
+                       QStringLiteral("stem_live_ready")) ==
+                1.0;
+    }));
+
+    deck.slotEjectTrack(1.0);
+}
+
+TEST_F(StemStatusControlProviderTest,
         CancelsActiveJobAndResetsOnTrackChange) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());
