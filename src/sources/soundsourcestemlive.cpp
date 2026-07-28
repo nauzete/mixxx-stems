@@ -34,8 +34,14 @@ SoundSource::OpenResult SoundSourceStemLive::tryOpen(
     if (!m_pLiveSession || !m_pLiveSession->track()) {
         return OpenResult::Failed;
     }
+    // The live-session track carries temporary stem metadata so the engine
+    // exposes the four stem controls immediately. Decode the original file
+    // through a clean temporary track, otherwise that metadata may make the
+    // regular source proxy treat the stereo fallback as a stem source.
+    const auto pOriginalTrack = Track::newTemporary(
+            m_pLiveSession->track()->getLocation());
     m_pOriginalProxy = std::make_unique<::SoundSourceProxy>(
-            m_pLiveSession->track());
+            pOriginalTrack);
     m_pOriginalSource = m_pOriginalProxy->openAudioSource(
             OpenParams(audio::ChannelCount::stereo(),
                     audio::SampleRate::fromDouble(44100.0)));

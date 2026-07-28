@@ -147,8 +147,9 @@ StemStatusControlProvider::~StemStatusControlProvider() {
         if (!pDeckState->liveSessionId.isEmpty()) {
             StemLiveSessionRegistry::release(
                     pDeckState->liveSessionId,
-                    pDeckState->pDeck->getLoadedTrack());
+                    pDeckState->pLiveSessionTrack);
             pDeckState->liveSessionId.clear();
+            pDeckState->pLiveSessionTrack.reset();
         }
     }
     m_pManager.reset();
@@ -693,6 +694,8 @@ QUrl StemStatusControlProvider::resolveForDeck(
                 pDeckState->cacheEntryId;
         pDeckState->previousLiveSessionId =
                 pDeckState->liveSessionId;
+        pDeckState->pPreviousLiveSessionTrack =
+                pDeckState->pLiveSessionTrack;
         resetDeck(pDeckState.get(), pTrack);
     }
     const auto lowerSourceFilePath =
@@ -740,6 +743,7 @@ QUrl StemStatusControlProvider::resolveForDeck(
     }
     pDeckState->liveSessionId =
             pLiveSession->id();
+    pDeckState->pLiveSessionTrack = pTrack;
     return pLiveSession->url();
 }
 
@@ -757,9 +761,12 @@ void StemStatusControlProvider::trackLoading(
             pDeckState->previousCacheEntryId;
     auto oldLiveSessionId =
             pDeckState->previousLiveSessionId;
+    auto pOldLiveSessionTrack =
+            pDeckState->pPreviousLiveSessionTrack;
     pDeckState->previousSourceFilePath.clear();
     pDeckState->previousCacheEntryId.clear();
     pDeckState->previousLiveSessionId.clear();
+    pDeckState->pPreviousLiveSessionTrack.reset();
     if (pOldTrack && pNewTrack &&
             pNewTrack->getLocation() ==
                     pOldTrack->getLocation()) {
@@ -772,6 +779,8 @@ void StemStatusControlProvider::trackLoading(
         oldCacheEntryId = pDeckState->cacheEntryId;
         oldLiveSessionId =
                 pDeckState->liveSessionId;
+        pOldLiveSessionTrack =
+                pDeckState->pLiveSessionTrack;
     }
     if (!pNewTrack) {
         resetDeck(pDeckState.get(), {});
@@ -781,7 +790,10 @@ void StemStatusControlProvider::trackLoading(
     }
     if (!oldLiveSessionId.isEmpty()) {
         StemLiveSessionRegistry::release(
-                oldLiveSessionId, pOldTrack);
+                oldLiveSessionId,
+                pOldLiveSessionTrack
+                        ? pOldLiveSessionTrack
+                        : pOldTrack);
     }
     if (!pOldTrack || !m_pManager) {
         return;
@@ -918,6 +930,7 @@ void StemStatusControlProvider::resetDeck(
     pDeckState->jobId.clear();
     pDeckState->cacheEntryId.clear();
     pDeckState->liveSessionId.clear();
+    pDeckState->pLiveSessionTrack.reset();
     pDeckState->pendingModel = false;
     pDeckState->pPercentage->setAndConfirm(0.0);
     pDeckState->pState->setAndConfirm(

@@ -72,9 +72,11 @@ class StemStatusControlProvider final : public QObject {
         QString jobId;
         QString cacheEntryId;
         QString liveSessionId;
+        TrackPointer pLiveSessionTrack;
         QString previousSourceFilePath;
         QString previousCacheEntryId;
         QString previousLiveSessionId;
+        TrackPointer pPreviousLiveSessionTrack;
         StemSeparationPriority requestedPriority =
                 StemSeparationPriority::LoadedNotPlaying;
         quint64 fingerprintGeneration = 0;
