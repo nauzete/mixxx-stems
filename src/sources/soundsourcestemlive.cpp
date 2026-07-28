@@ -34,14 +34,8 @@ SoundSource::OpenResult SoundSourceStemLive::tryOpen(
     if (!m_pLiveSession || !m_pLiveSession->track()) {
         return OpenResult::Failed;
     }
-    // The live-session track carries temporary stem metadata so the engine
-    // exposes the four stem controls immediately. Decode the original file
-    // through a clean temporary track, otherwise that metadata may make the
-    // regular source proxy treat the stereo fallback as a stem source.
-    const auto pOriginalTrack = Track::newTemporary(
-            m_pLiveSession->track()->getLocation());
     m_pOriginalProxy = std::make_unique<::SoundSourceProxy>(
-            pOriginalTrack);
+            m_pLiveSession->track());
     m_pOriginalSource = m_pOriginalProxy->openAudioSource(
             OpenParams(audio::ChannelCount::stereo(),
                     audio::SampleRate::fromDouble(44100.0)));
@@ -86,20 +80,19 @@ SoundSourceStemLive::readSampleFramesClamped(
     if (frameCount <= 0) {
         return {};
     }
-    if (m_requestedChannelCount ==
-            audio::ChannelCount::stereo()) {
-        return m_pOriginalSource->readSampleFrames(
-                sampleFrames);
-    }
+    const auto outputChannelCount =
+            static_cast<SINT>(m_requestedChannelCount);
     if (sampleFrames.writableLength() !=
-            frameCount *
-                    static_cast<SINT>(kStemChannelCount)) {
+            frameCount * outputChannelCount) {
         return {};
     }
 
+    const auto originalChannelCount =
+            static_cast<SINT>(
+                    m_pOriginalSource->getSignalInfo()
+                            .getChannelCount());
     const auto originalSampleCount =
-            frameCount *
-            audio::ChannelCount::stereo();
+            frameCount * originalChannelCount;
     if (m_originalBuffer.size() < originalSampleCount) {
         m_originalBuffer =
                 SampleBuffer(originalSampleCount);
@@ -114,21 +107,46 @@ SoundSourceStemLive::readSampleFramesClamped(
                     *m_pOriginalSource,
                     originalFrames);
     auto* const pOutput = sampleFrames.writableData();
-    SampleUtil::clear(
-            pOutput, sampleFrames.writableLength());
     const auto readableFrames =
             original.readableLength() /
-            audio::ChannelCount::stereo();
+            originalChannelCount;
+    if (m_requestedChannelCount ==
+            audio::ChannelCount::stereo()) {
+        for (SINT frame = 0; frame < readableFrames; ++frame) {
+            const auto originalOffset =
+                    frame * originalChannelCount;
+            const auto outputOffset = frame * 2;
+            pOutput[outputOffset] =
+                    original.readableData()[originalOffset];
+            pOutput[outputOffset + 1] =
+                    original.readableData()[originalOffset +
+                            (originalChannelCount > 1 ? 1 : 0)];
+        }
+        return ReadableSampleFrames(
+                IndexRange::forward(
+                        sampleFrames.frameIndexRange().start(),
+                        readableFrames),
+                SampleBuffer::ReadableSlice(
+                        pOutput, readableFrames * 2));
+    }
+
+    SampleUtil::clear(
+            pOutput, sampleFrames.writableLength());
     for (SINT frame = 0; frame < readableFrames; ++frame) {
+        const auto originalOffset =
+                frame * originalChannelCount;
+        const auto left =
+                original.readableData()[originalOffset];
+        const auto right =
+                original.readableData()[originalOffset +
+                        (originalChannelCount > 1 ? 1 : 0)];
         for (std::size_t stem = 0; stem < 4; ++stem) {
             pOutput[frame * kStemChannelCount +
                     stem * 2] =
-                    original.readableData()[frame * 2] *
-                    0.25F;
+                    left * 0.25F;
             pOutput[frame * kStemChannelCount +
                     stem * 2 + 1] =
-                    original.readableData()[frame * 2 + 1] *
-                    0.25F;
+                    right * 0.25F;
         }
     }
     const auto relativeFrameOffset =

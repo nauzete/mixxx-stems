@@ -169,6 +169,41 @@ TEST_F(SoundSourceStemLiveTest,
 }
 
 TEST_F(SoundSourceStemLiveTest,
+        ConvertsMonoOriginalToStereoFallback) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto pTrack = Track::newTemporary(
+            getTestDir().filePath(
+                    QStringLiteral("sine-30.wav")));
+    auto pLiveSession =
+            stems::StemLiveSessionRegistry::acquire(
+                    directory.path(), pTrack);
+    ASSERT_TRUE(pLiveSession);
+
+    SoundSourceStemLive source(pLiveSession->url());
+    AudioSource::OpenParams params;
+    params.setChannelCount(audio::ChannelCount::stereo());
+    params.setSampleRate(audio::SampleRate(44100));
+    ASSERT_EQ(source.open(
+                      SoundSource::OpenMode::Strict, params),
+            SoundSource::OpenResult::Succeeded);
+    std::array<CSAMPLE, 2> output{};
+    const auto read = source.readSampleFrames(
+            WritableSampleFrames(
+                    IndexRange::forward(
+                            source.frameIndexMin(), 1),
+                    SampleBuffer::WritableSlice(
+                            output.data(), output.size())));
+    ASSERT_EQ(read.readableLength(), 2);
+    EXPECT_FLOAT_EQ(output[0], output[1]);
+
+    source.close();
+    stems::StemLiveSessionRegistry::release(
+            pLiveSession->id(), pTrack);
+    pLiveSession.reset();
+}
+
+TEST_F(SoundSourceStemLiveTest,
         RemovesCrashLeftoversButPreservesActiveSessions) {
     QTemporaryDir directory;
     ASSERT_TRUE(directory.isValid());
