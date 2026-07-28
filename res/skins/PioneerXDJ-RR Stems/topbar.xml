@@ -102,11 +102,11 @@
                     <State><Number>0</Number><Text>-</Text></State>
                     <Connection><ConfigKey>[StemSeparation],inference_threads_down</ConfigKey></Connection>
                   </PushButton>
-                  <NumberPos>
+                  <Number>
                     <ObjectName>StemThreadsValue</ObjectName>
-                    <Size>38max,25max</Size><NumberOfDigits>2</NumberOfDigits>
+                    <Size>38max,25max</Size><NumberOfDigits>0</NumberOfDigits>
                     <Connection><ConfigKey>[StemSeparation],inference_threads</ConfigKey></Connection>
-                  </NumberPos>
+                  </Number>
                   <PushButton>
                     <ObjectName>StemThreadsButton</ObjectName>
                     <Size>28max,25max</Size><NumberStates>1</NumberStates>
