@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
         mixxx::stems::DemucsOnnxRunner runner(modelPath);
         mixxx::stems::StemChunkPipeline pipeline(runner);
         const auto frameCount =
-                mixxx::stems::StemChunkPipeline::kStrideSampleCount + 1024;
+                pipeline.strideSampleCount() + 1024;
         std::size_t writtenFrameCount = 0;
         float maximumAbsoluteOutput = 0.0F;
         float finalProgress = 0.0F;
@@ -78,9 +78,11 @@ int main(int argc, char** argv) {
 
         std::cout << "ONNX Runtime " << runner.runtimeVersion() << '\n'
                   << "Input tensor: "
-                  << runner.contract().inputName << " [1, 2, 343980]\n"
+                  << runner.contract().inputName << " [1, 2, "
+                  << runner.segmentSampleCount() << "]\n"
                   << "Output tensor: "
-                  << runner.contract().outputName << " [1, 4, 2, 343980]\n"
+                  << runner.contract().outputName << " [1, 4, 2, "
+                  << runner.segmentSampleCount() << "]\n"
                   << "Separated frames: " << writtenFrameCount << '\n'
                   << "Maximum absolute output: " << maximumAbsoluteOutput
                   << '\n';

@@ -7,9 +7,11 @@ are pinned in `.github/workflows/model-export.yml`.
 FFmpeg is installed explicitly to decode the upstream MP3 fixture, and its
 resolved version is recorded in the model manifest.
 
-The workflow calls the upstream `scripts/convert-pth-to-onnx.py` exporter and
-then applies project-specific validation. It does not substitute a different
-model or exporter.
+The workflow loads the same official checkpoint/export path and fixes the
+runtime segment to 3.9 seconds without padding back to the 7.8-second training
+segment. It then applies project-specific validation, including a direct
+quality comparison against the official padded path. It does not substitute a
+different model or checkpoint.
 
 ## Outputs
 

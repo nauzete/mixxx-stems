@@ -1,0 +1,447 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow
+
+name: Mixxx Stems packages
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - stems-integration
+  push:
+    tags:
+      - "stems-v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stems-packages-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  HTDEMUCS_SHA256: db37d1314ac1e1051e7978d25ef45b3f1d3f43c837678752f592c0f2deca752d
+  HTDEMUCS_TAG: htdemucs-955717e8-onnx-v1
+  VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg-binary-cache,readwrite
+  VCPKG_COMMIT: 859d11a94a9cf32fbf7fecc7de3b54980102470b
+  VCPKG_MAX_CONCURRENCY: 3
+
+jobs:
+  windows-x64:
+    name: Windows x64 MSI and portable ZIP
+    runs-on: windows-2025
+    timeout-minutes: 240
+    env:
+      BUILDENV_BASEPATH: C:\buildenv
+      BUILDENV_RELEASE: "TRUE"
+      VCPKG_DEFAULT_HOST_TRIPLET: x64-windows-release
+      VCPKG_DEFAULT_TRIPLET: x64-windows-release
+    steps:
+      - name: Check out Mixxx Stems
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check out pinned vcpkg fork
+        uses: actions/checkout@v7
+        with:
+          repository: nauzete/vcpkg-mixxx-stems
+          ref: ${{ env.VCPKG_COMMIT }}
+          path: _deps/vcpkg-stems
+          persist-credentials: false
+
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v6
+        with:
+          path: vcpkg-binary-cache
+          key: stems-packages-windows-x64-${{ env.VCPKG_COMMIT }}
+
+      - name: Create vcpkg binary cache
+        run: cmake -E make_directory "${{ github.workspace }}/vcpkg-binary-cache"
+
+      - name: Set up CMake
+        uses: jwlawson/actions-setup-cmake@v2.2
+        with:
+          cmake-version: "3.30.x"
+
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Set up official Mixxx build environment
+        shell: cmd
+        run: tools\windows_buildenv.bat setup
+
+      - name: Restore missing Mixxx build environment
+        shell: pwsh
+        run: |
+          $toolchain = Join-Path $env:MIXXX_VCPKG_ROOT `
+            "scripts\buildsystems\vcpkg.cmake"
+          if (!(Test-Path $toolchain)) {
+            $archive = Join-Path $env:RUNNER_TEMP "mixxx-buildenv.zip"
+            curl.exe --fail --location --retry 3 `
+              --output $archive $env:BUILDENV_URL
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+            $actual = (Get-FileHash -Algorithm SHA256 $archive).Hash.ToLowerInvariant()
+            if ($actual -ne $env:BUILDENV_SHA256) {
+              throw "Unexpected Mixxx build environment SHA-256: $actual"
+            }
+            7z.exe x -y "-o$env:BUILDENV_BASEPATH" $archive
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
+          if (!(Test-Path $toolchain)) {
+            throw "Mixxx vcpkg toolchain is missing after environment setup"
+          }
+
+      - name: Bootstrap pinned vcpkg
+        run: .\bootstrap-vcpkg.bat
+        working-directory: _deps/vcpkg-stems
+
+      - name: Build ONNX Runtime CPU in the Mixxx environment
+        shell: pwsh
+        run: |
+          & "${{ github.workspace }}\_deps\vcpkg-stems\vcpkg.exe" install `
+            onnxruntime:x64-windows-release `
+            "--overlay-ports=${{ github.workspace }}\_deps\vcpkg-stems\ports" `
+            "--x-install-root=$env:MIXXX_VCPKG_ROOT\installed" `
+            --clean-after-build `
+            --x-abi-tools-use-exact-versions
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Configure Mixxx Stems
+        run: >-
+          cmake
+          -S .
+          -B build
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DMIXXX_STEMS_BUILD=ON
+          -DONNXRUNTIME=ON
+          -DSTEM=ON
+          -DBULK=ON
+          -DHID=ON
+          -DLOCALECOMPARE=ON
+          -DMAD=ON
+          -DMEDIAFOUNDATION=ON
+          -DMODPLUG=ON
+          -DQT6=ON
+          -DQML=ON
+          -DWAVPACK=ON
+          -DVCPKG_TARGET_TRIPLET=x64-windows-release
+          -DWARNINGS_FATAL=ON
+          -DDEBUG_ASSERTIONS_FATAL=OFF
+
+      - name: Build Mixxx Stems
+        run: cmake --build build --config RelWithDebInfo --parallel 2
+
+      - name: Test Mixxx Stems
+        shell: pwsh
+        run: |
+          ctest --test-dir build --timeout 90 --repeat until-pass:2 `
+            --tests-regex '^(Demucs|SoundSourceStemLiveTest|Stem)' `
+            --output-on-failure
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Build real-model smoke test
+        run: >-
+          cmake
+          -S tools/stems/onnx-smoke
+          -B build/onnx-smoke
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE=${{ env.MIXXX_VCPKG_ROOT }}/scripts/buildsystems/vcpkg.cmake
+          -DVCPKG_TARGET_TRIPLET=x64-windows-release
+
+      - name: Compile real-model smoke test
+        run: cmake --build build/onnx-smoke --config Release --parallel 2
+
+      - name: Download and verify HTDemucs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release download "$env:HTDEMUCS_TAG" `
+            --repo nauzete/mixxx-stems `
+            --pattern htdemucs.onnx `
+            --dir model
+          $actual = (Get-FileHash -Algorithm SHA256 model/htdemucs.onnx).Hash.ToLowerInvariant()
+          if ($actual -ne $env:HTDEMUCS_SHA256) {
+            throw "Unexpected model SHA-256: $actual"
+          }
+          $smoke = Get-ChildItem build/onnx-smoke -Recurse `
+            -Filter demucs-onnx-smoke.exe |
+            Select-Object -First 1 -ExpandProperty FullName
+          $benchmark = Get-ChildItem build/onnx-smoke -Recurse `
+            -Filter demucs-onnx-benchmark.exe |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (!$smoke -or !$benchmark) {
+            throw "Real-model validation executables are missing"
+          }
+          & $smoke model/htdemucs.onnx
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          foreach ($threads in @(1, 2, 4, 8)) {
+            & $benchmark `
+              model/htdemucs.onnx $threads `
+              "build/benchmark-windows-x64-$threads-threads.json"
+            if ($LASTEXITCODE -ne 0) {
+              exit $LASTEXITCODE
+            }
+          }
+
+      - name: Install WiX Toolset
+        run: |
+          dotnet.exe tool install --global wix --version 6.0.2
+          wix extension add --global WixToolset.UI.wixext/6.0.2
+
+      - name: Create MSI and portable ZIP
+        shell: pwsh
+        run: |
+          Push-Location build
+          cpack -G WIX -V
+          $cpackExitCode = $LASTEXITCODE
+          Pop-Location
+          if ($cpackExitCode -ne 0) {
+            Get-Content build/_CPack_Packages/win64/WIX/wix.log `
+              -ErrorAction SilentlyContinue
+            exit $cpackExitCode
+          }
+          cmake --install build --config RelWithDebInfo `
+            --prefix "${{ github.workspace }}\build\portable"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+          Compress-Archive `
+            -Path "${{ github.workspace }}\build\portable\*" `
+            -DestinationPath "${{ github.workspace }}\build\Mixxx-Stems-x64-portable.zip"
+
+      - name: Validate Windows packages
+        shell: pwsh
+        run: |
+          $msi = "${{ github.workspace }}\build\Mixxx-Stems-x64.msi"
+          $zip = "${{ github.workspace }}\build\Mixxx-Stems-x64-portable.zip"
+          $portable = "${{ github.workspace }}\build\portable"
+          if (!(Test-Path $msi) -or !(Test-Path $zip)) {
+            throw "Expected MSI and portable ZIP were not generated"
+          }
+          if (!(Test-Path "$portable\mixxx.exe")) {
+            throw "Portable executable is missing"
+          }
+          if (!(Test-Path "$portable\onnxruntime.dll")) {
+            throw "Portable ONNX Runtime DLL is missing"
+          }
+          $headers = dumpbin /headers "$portable\mixxx.exe" | Out-String
+          $headers | Write-Output
+          if ($headers -notmatch "8664 machine \(x64\)") {
+            throw "Portable executable is not x64"
+          }
+          & "$portable\mixxx.exe" --help
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+          $adminImage = "${{ runner.temp }}\mixxx-stems-msi"
+          $process = Start-Process msiexec.exe -Wait -PassThru -ArgumentList @(
+            "/a", $msi, "/qn", "TARGETDIR=$adminImage"
+          )
+          if ($process.ExitCode -ne 0) {
+            throw "MSI administrative install failed: $($process.ExitCode)"
+          }
+          if (!(Get-ChildItem $adminImage -Recurse -Filter onnxruntime.dll)) {
+            throw "MSI does not contain onnxruntime.dll"
+          }
+
+          foreach ($file in @($msi, $zip)) {
+            $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLowerInvariant()
+            "$hash  $([IO.Path]::GetFileName($file))" |
+              Set-Content -Encoding ascii "$file.sha256"
+          }
+
+      - name: Upload Windows packages
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: Mixxx-Stems-Windows-x64
+          path: |
+            build/Mixxx-Stems-x64.msi
+            build/Mixxx-Stems-x64.msi.sha256
+            build/Mixxx-Stems-x64-portable.zip
+            build/Mixxx-Stems-x64-portable.zip.sha256
+            build/benchmark-windows-x64-*-threads.json
+
+  ubuntu-arm64:
+    name: Ubuntu ARM64 DEB
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 240
+    env:
+      VCPKG_DEFAULT_HOST_TRIPLET: arm64-linux-release
+      VCPKG_DEFAULT_TRIPLET: arm64-linux-release
+    steps:
+      - name: Check out Mixxx Stems
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check out pinned vcpkg fork
+        uses: actions/checkout@v7
+        with:
+          repository: nauzete/vcpkg-mixxx-stems
+          ref: ${{ env.VCPKG_COMMIT }}
+          path: _deps/vcpkg
+          persist-credentials: false
+
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v6
+        with:
+          path: vcpkg-binary-cache
+          key: stems-packages-ubuntu-arm64-${{ env.VCPKG_COMMIT }}
+
+      - name: Create vcpkg binary cache
+        run: cmake -E make_directory "${{ github.workspace }}/vcpkg-binary-cache"
+
+      - name: Verify native ARM64 runner
+        run: test "$(uname -m)" = "aarch64"
+
+      - name: Set up official Mixxx build environment
+        run: tools/debian_buildenv.sh setup
+
+      - name: Bootstrap vcpkg
+        run: ./bootstrap-vcpkg.sh
+        working-directory: _deps/vcpkg
+
+      - name: Build static ONNX Runtime CPU
+        run: >-
+          ./vcpkg install
+          onnxruntime:arm64-linux-release
+          --classic
+          --clean-after-build
+          --x-abi-tools-use-exact-versions
+        working-directory: _deps/vcpkg
+
+      - name: Configure Mixxx Stems
+        run: >-
+          cmake
+          -S .
+          -B build
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_PREFIX_PATH=${{ github.workspace }}/_deps/vcpkg/installed/arm64-linux-release
+          -DMIXXX_STEMS_BUILD=ON
+          -DONNXRUNTIME=ON
+          -DSTEM=ON
+          -DQT6=ON
+          -DQML=ON
+          -DBULK=ON
+          -DFFMPEG=ON
+          -DHID=ON
+          -DINSTALL_USER_UDEV_RULES=OFF
+          -DWARNINGS_FATAL=ON
+          -DDEBUG_ASSERTIONS_FATAL=OFF
+
+      - name: Build Mixxx Stems
+        run: cmake --build build --config RelWithDebInfo --parallel 2
+
+      - name: Test Mixxx Stems
+        run: >-
+          ctest
+          --test-dir build
+          --timeout 90
+          --repeat until-pass:2
+          --tests-regex '^(Demucs|SoundSourceStemLiveTest|Stem)'
+          --output-on-failure
+
+      - name: Build real-model smoke test
+        run: >-
+          cmake
+          -S tools/stems/onnx-smoke
+          -B build/onnx-smoke
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/_deps/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DVCPKG_TARGET_TRIPLET=arm64-linux-release
+
+      - name: Compile real-model smoke test
+        run: cmake --build build/onnx-smoke --config Release --parallel 2
+
+      - name: Download and verify HTDemucs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${HTDEMUCS_TAG}" \
+            --repo nauzete/mixxx-stems \
+            --pattern htdemucs.onnx \
+            --dir model
+          echo "${HTDEMUCS_SHA256}  model/htdemucs.onnx" | sha256sum --check
+          build/onnx-smoke/demucs-onnx-smoke model/htdemucs.onnx
+          for threads in 1 2 4; do
+            build/onnx-smoke/demucs-onnx-benchmark \
+              model/htdemucs.onnx "${threads}" \
+              "build/benchmark-ubuntu-arm64-${threads}-threads.json"
+          done
+
+      - name: Create ARM64 DEB
+        run: cpack --config build/CPackConfig.cmake -B build -G DEB -V
+
+      - name: Validate and install ARM64 DEB
+        run: |
+          set -euo pipefail
+          package="$(find build -maxdepth 1 -type f -name 'mixxx-stems_*_arm64.deb' -print -quit)"
+          test -n "${package}"
+          test "$(dpkg-deb -f "${package}" Architecture)" = "arm64"
+
+          extract_dir="${RUNNER_TEMP}/mixxx-stems-arm64"
+          mkdir -p "${extract_dir}"
+          dpkg-deb -x "${package}" "${extract_dir}"
+          binary="$(find "${extract_dir}" -type f -name mixxx -print -quit)"
+          test -n "${binary}"
+          file "${binary}" | grep -Eq 'ELF 64-bit LSB.*ARM aarch64'
+          ! ldd "${binary}" | grep -q 'not found'
+
+          runtime="$(find "${extract_dir}" -type f -name 'libonnxruntime.so*' -print -quit)"
+          if [[ -n "${runtime}" ]]; then
+            file "${runtime}" | grep -Eq 'ELF 64-bit LSB.*ARM aarch64'
+          fi
+
+          sudo apt-get install -y "./${package}"
+          QT_QPA_PLATFORM=offscreen mixxx --help
+          sha256sum "${package}" > "${package}.sha256"
+
+      - name: Upload ARM64 package
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: Mixxx-Stems-Ubuntu-ARM64
+          path: |
+            build/mixxx-stems_*_arm64.deb
+            build/mixxx-stems_*_arm64.deb.sha256
+            build/benchmark-ubuntu-arm64-*-threads.json
+
+  release:
+    name: Publish tagged release
+    if: startsWith(github.ref, 'refs/tags/stems-v')
+    needs:
+      - windows-x64
+      - ubuntu-arm64
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download validated packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: Mixxx-Stems-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${GITHUB_REF_NAME}"
+          release-assets/*
+          --repo "${GITHUB_REPOSITORY}"
+          --title "Mixxx Stems ${GITHUB_REF_NAME#stems-v}"
+          --generate-notes

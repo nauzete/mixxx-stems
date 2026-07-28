@@ -614,6 +614,17 @@ void BaseTrackPlayerImpl::disconnectLoadedTrack() {
 }
 
 #ifdef __STEM__
+void BaseTrackPlayerImpl::setAlternateAudioSourceResolver(
+        const AlternateAudioSourceResolver& resolver) {
+    m_alternateAudioSourceResolver = resolver;
+}
+
+void BaseTrackPlayerImpl::publishStemFramesAvailable(
+        SINT readyFrameCount) {
+    m_pChannel->getEngineBuffer()
+            ->publishStemFramesAvailable(readyFrameCount);
+}
+
 void BaseTrackPlayerImpl::slotLoadTrack(TrackPointer pNewTrack,
         mixxx::StemChannelSelection stemMask,
         bool bPlay) {
@@ -632,6 +643,13 @@ void BaseTrackPlayerImpl::slotLoadTrack(TrackPointer pNewTrack,
         }
     }
 
+#ifdef __STEM__
+    const auto alternateAudioUrl =
+            pNewTrack && m_alternateAudioSourceResolver
+            ? m_alternateAudioSourceResolver(pNewTrack)
+            : QUrl{};
+#endif
+
     auto pOldTrack = unloadTrack();
 
     loadTrack(pNewTrack);
@@ -647,7 +665,8 @@ void BaseTrackPlayerImpl::slotLoadTrack(TrackPointer pNewTrack,
     pEngineBuffer->loadTrack(pNewTrack,
             stemMask,
             bPlay,
-            m_pChannelToCloneFrom);
+            m_pChannelToCloneFrom,
+            alternateAudioUrl);
 
     // Select a specific stem if requested
     emit selectedStems(stemMask);

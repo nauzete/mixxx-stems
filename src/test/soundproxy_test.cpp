@@ -202,6 +202,32 @@ TEST_F(SoundSourceProxyTest, open) {
     }
 }
 
+#ifdef __STEM__
+TEST_F(SoundSourceProxyTest,
+        alternateAudioSourceRetainsLogicalTrack) {
+    const auto logicalFilePath =
+            getTestFile(QStringLiteral(".flac"));
+    const auto alternateFilePath =
+            getTestFile(QStringLiteral(".ogg"));
+    auto pTrack = Track::newTemporary(logicalFilePath);
+    pTrack->setTitle(QStringLiteral("Original library metadata"));
+
+    SoundSourceProxy proxy(
+            pTrack, QUrl::fromLocalFile(alternateFilePath));
+    EXPECT_EQ(proxy.getTrack(), pTrack);
+    EXPECT_EQ(proxy.getUrl(),
+            QUrl::fromLocalFile(alternateFilePath));
+
+    auto pAudioSource = proxy.openAudioSource();
+
+    ASSERT_TRUE(pAudioSource);
+    EXPECT_EQ(pTrack->getLocation(), logicalFilePath);
+    EXPECT_EQ(pTrack->getTitle(),
+            QStringLiteral("Original library metadata"));
+    pAudioSource->close();
+}
+#endif
+
 TEST_F(SoundSourceProxyTest, openEmptyFile) {
     const QStringList fileNameSuffixes = getFileNameSuffixes();
 
@@ -1128,8 +1154,9 @@ TEST_F(SoundSourceProxyTest, taglibStringToEnumFileType) {
     const QStringList fileTypes = SoundSourceProxy::getSupportedFileTypes();
     for (const auto& fileType : fileTypes) {
         qDebug() << fileType;
-        if (fileType != "okt" &&     // Oktalyzer
-                fileType != "stm") { // "Scream Tracker";
+        if (fileType != "okt" &&          // Oktalyzer
+                fileType != "stm" &&      // Scream Tracker
+                fileType != "stemlive") { // Internal live-stem source
             ASSERT_NE(mixxx::taglib::stringToEnumFileType(fileType),
                     mixxx::taglib::FileType::Unknown);
         }

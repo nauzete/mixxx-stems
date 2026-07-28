@@ -38,6 +38,7 @@
 #endif
 #ifdef __STEM__
 #include "sources/soundsourcestem.h"
+#include "sources/soundsourcestemlive.h"
 #endif
 
 #include "library/coverartutils.h"
@@ -240,6 +241,10 @@ bool SoundSourceProxy::registerProviders() {
     registerSoundSourceProvider(
             &s_soundSourceProviders,
             std::make_shared<mixxx::SoundSourceProviderSTEM>());
+    registerSoundSourceProvider(
+            &s_soundSourceProviders,
+            std::make_shared<
+                    mixxx::SoundSourceProviderStemLive>());
 #endif
     // Register the high-priority reference providers AFTER all other
     // providers to verify that their priorities are correct.
@@ -442,6 +447,17 @@ SoundSourceProxy::SoundSourceProxy(TrackPointer pTrack)
           m_providerRegistrations(allProviderRegistrationsForUrl(m_url)) {
     findProviderAndInitSoundSource();
 }
+
+#ifdef __STEM__
+SoundSourceProxy::SoundSourceProxy(
+        TrackPointer pTrack, const QUrl& audioUrl)
+        : m_pTrack(std::move(pTrack)),
+          m_url(audioUrl),
+          m_providerRegistrations(
+                  allProviderRegistrationsForUrl(m_url)) {
+    findProviderAndInitSoundSource();
+}
+#endif
 
 SoundSourceProxy::SoundSourceProxy(const QUrl& url)
         : m_url(url),

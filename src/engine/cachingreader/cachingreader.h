@@ -3,8 +3,10 @@
 #include <QAtomicInt>
 #include <QHash>
 #include <QList>
+#include <QUrl>
 #include <QVarLengthArray>
 #include <QVector>
+#include <atomic>
 #include <list>
 
 #include "engine/cachingreader/cachingreaderworker.h"
@@ -117,7 +119,14 @@ class CachingReader : public QObject {
     // processed in the work thread, so the reader must be woken up via wake()
     // for this to take effect.
 #ifdef __STEM__
-    void newTrack(TrackPointer pTrack, mixxx::StemChannelSelection stemMask = {});
+    void newTrack(TrackPointer pTrack,
+            mixxx::StemChannelSelection stemMask = {},
+            QUrl alternateAudioUrl = {});
+
+    /// Notify the engine-side cache that progressively generated stem frames
+    /// have replaced the temporary original-track fallback. This method is
+    /// lock-free and may be called from the GUI thread.
+    void publishStemFramesAvailable(SINT readyFrameCount);
 #else
     void newTrack(TrackPointer pTrack);
 #endif
@@ -186,6 +195,13 @@ class CachingReader : public QObject {
     // Keeps track of what CachingReaderChunks we've allocated and indexes them based on what
     // chunk number they are allocated to.
     QHash<int, CachingReaderChunkForOwner*> m_allocatedCachingReaderChunks;
+
+#ifdef __STEM__
+    std::atomic<SINT> m_publishedStemFrameCount{0};
+    std::atomic<quint64> m_stemPublicationGeneration{0};
+    quint64 m_invalidatedStemPublicationGeneration{0};
+    SINT m_invalidatedStemFrameCount{0};
+#endif
 
     // The linked list of recently-used chunks.
     CachingReaderChunkForOwner* m_mruCachingReaderChunk;

@@ -1441,6 +1441,21 @@ bool Track::importPendingCueInfosWhileLocked() {
 }
 
 #ifdef __STEM__
+bool Track::setStemInfosForTemporarySource(
+        QList<StemInfo> stemInfos) {
+    const QMutexLocker lock(&m_qMutex);
+    if (!m_stemInfo.isEmpty() || stemInfos.isEmpty()) {
+        return false;
+    }
+    m_stemInfo = std::move(stemInfos);
+    return true;
+}
+
+void Track::clearStemInfosForTemporarySource() {
+    const QMutexLocker lock(&m_qMutex);
+    m_stemInfo.clear();
+}
+
 bool Track::setStemInfosWhileLocked(QList<StemInfo> stemInfos) {
     m_stemInfo = std::move(stemInfos);
     return true;

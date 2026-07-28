@@ -11,10 +11,31 @@ if(NOT GIT_DESCRIBE)
 else()
   set(PACKAGE_VERSION "${GIT_DESCRIBE}")
 endif()
-set(
-  CPACK_PACKAGE_FILE_NAME
-  "mixxx-${PACKAGE_VERSION}-${CPACK_SYSTEM_PROCESSOR}"
-)
+if(CPACK_MIXXX_STEMS_BUILD)
+  if(CPACK_GENERATOR STREQUAL "WIX")
+    set(CPACK_PACKAGE_FILE_NAME "Mixxx-Stems-x64")
+  elseif(CPACK_GENERATOR STREQUAL "DEB")
+    if(CPACK_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+      set(_stems_package_architecture "arm64")
+    else()
+      set(_stems_package_architecture "${CPACK_SYSTEM_PROCESSOR}")
+    endif()
+    set(
+      CPACK_PACKAGE_FILE_NAME
+      "mixxx-stems_${PACKAGE_VERSION}_${_stems_package_architecture}"
+    )
+  else()
+    set(
+      CPACK_PACKAGE_FILE_NAME
+      "mixxx-stems-${PACKAGE_VERSION}-${CPACK_SYSTEM_PROCESSOR}"
+    )
+  endif()
+else()
+  set(
+    CPACK_PACKAGE_FILE_NAME
+    "mixxx-${PACKAGE_VERSION}-${CPACK_SYSTEM_PROCESSOR}"
+  )
+endif()
 set(CPACK_SOURCE_PACKAGE_FILE_NAME "${CPACK_PACKAGE_FILE_NAME}-source")
 
 # The upstream version must not contain hyphen

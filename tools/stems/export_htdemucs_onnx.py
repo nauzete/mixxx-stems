@@ -72,6 +72,23 @@ def parse_args() -> argparse.Namespace:
         default=2e-2,
         help="Maximum permitted absolute parity error",
     )
+    parser.add_argument(
+        "--segment-seconds",
+        type=float,
+        help=(
+            "Export an experimental fixed short-segment variant using the "
+            "official HTDemucs weights. Omit for the official 7.8-second "
+            "export."
+        ),
+    )
+    parser.add_argument(
+        "--skip-real-audio-fixture",
+        action="store_true",
+        help=(
+            "Skip the repository MP3 parity fixture for local experiments. "
+            "Release exports must not use this option."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -146,6 +163,33 @@ def run_official_exporter(demucs_dir: Path, output_dir: Path) -> Path:
         raise RuntimeError(
             "The official Demucs exporter did not produce "
             "a non-empty ONNX model"
+        )
+    return model_path
+
+
+def export_short_segment_variant(
+    core_model,
+    output_dir: Path,
+    segment_samples: int,
+) -> Path:
+    """Export official weights without padding to the train segment."""
+    core_model.onnx_exportable = True
+    core_model.use_train_segment = False
+    dummy_input = torch.randn(1, 2, segment_samples)
+    model_path = output_dir / f"{MODEL_NAME}.onnx"
+    torch.onnx.export(
+        core_model,
+        dummy_input,
+        str(model_path),
+        export_params=True,
+        opset_version=OPSET_VERSION,
+        do_constant_folding=True,
+        input_names=["input"],
+        output_names=["output"],
+    )
+    if not model_path.is_file() or model_path.stat().st_size == 0:
+        raise RuntimeError(
+            "The short-segment export did not produce a non-empty ONNX model"
         )
     return model_path
 
@@ -327,6 +371,30 @@ def error_metrics(
     }
 
 
+def reference_metrics(
+    reference: np.ndarray, candidate: np.ndarray
+) -> dict[str, Any]:
+    metrics = error_metrics(reference, candidate)
+    reference_flat = reference.astype(np.float64).ravel()
+    candidate_flat = candidate.astype(np.float64).ravel()
+    denominator = np.linalg.norm(reference_flat) * np.linalg.norm(
+        candidate_flat
+    )
+    metrics["cosine_similarity"] = (
+        float(np.dot(reference_flat, candidate_flat) / denominator)
+        if denominator > 0
+        else 1.0
+    )
+    reference_energy = float(np.mean(reference_flat**2))
+    error_energy = float(np.mean((reference_flat - candidate_flat) ** 2))
+    metrics["signal_to_error_db"] = (
+        float(10.0 * math.log10(reference_energy / error_energy))
+        if reference_energy > 0 and error_energy > 0
+        else None
+    )
+    return metrics
+
+
 def validate_metrics(
     name: str,
     metrics: dict[str, Any],
@@ -343,6 +411,25 @@ def validate_metrics(
         )
 
 
+def validate_short_segment_quality(
+    name: str,
+    metrics: dict[str, Any],
+    minimum_cosine_similarity: float = 0.995,
+    minimum_signal_to_error_db: float = 20.0,
+) -> None:
+    signal_to_error_db = metrics["signal_to_error_db"]
+    if (
+        metrics["cosine_similarity"] < minimum_cosine_similarity
+        or signal_to_error_db is None
+        or signal_to_error_db < minimum_signal_to_error_db
+    ):
+        raise RuntimeError(
+            f"{name} quality regression: {metrics!r}; "
+            f"cosine >= {minimum_cosine_similarity}, "
+            f"signal/error >= {minimum_signal_to_error_db} dB"
+        )
+
+
 def run_parity(
     core_model,
     session: ort.InferenceSession,
@@ -350,6 +437,7 @@ def run_parity(
     fixtures: dict[str, torch.Tensor],
     mean_tolerance: float,
     max_tolerance: float,
+    compare_train_segment: bool = False,
 ) -> dict[str, Any]:
     results: dict[str, Any] = {}
     for fixture_name, fixture in fixtures.items():
@@ -372,6 +460,24 @@ def run_parity(
         fixture_results: dict[str, Any] = {
             "pytorch_onnx_path_vs_onnxruntime": ort_metrics
         }
+        if compare_train_segment:
+            core_model.use_train_segment = True
+            padded_reference = torch_inference(
+                core_model,
+                fixture,
+                onnx_exportable=True,
+            )
+            core_model.use_train_segment = False
+            short_segment_metrics = reference_metrics(
+                padded_reference, pytorch_onnx_path
+            )
+            validate_short_segment_quality(
+                f"{fixture_name}: short segment vs official padded reference",
+                short_segment_metrics,
+            )
+            fixture_results["short_segment_vs_official_padded_reference"] = (
+                short_segment_metrics
+            )
         if fixture_name == "synthetic":
             pytorch_native = torch_inference(
                 core_model,
@@ -445,29 +551,45 @@ def main() -> int:
         raise RuntimeError(f"Output directory must be empty: {output_dir}")
 
     sys.path.insert(0, str(demucs_dir))
-    model_path = run_official_exporter(demucs_dir, output_dir)
-    _, onnx_metadata = load_and_check_onnx(model_path)
-
     core_model = load_core_model()
     sample_rate = int(core_model.samplerate)
-    segment_seconds = float(core_model.segment)
+    official_segment_seconds = float(core_model.segment)
+    if args.segment_seconds is None:
+        segment_seconds = official_segment_seconds
+        model_path = run_official_exporter(demucs_dir, output_dir)
+    else:
+        segment_seconds = args.segment_seconds
+        if not 1.0 <= segment_seconds < official_segment_seconds:
+            raise ValueError(
+                "--segment-seconds must be at least 1.0 and shorter than "
+                f"the official {official_segment_seconds:g}-second segment"
+            )
+        model_path = export_short_segment_variant(
+            core_model,
+            output_dir,
+            round(segment_seconds * sample_rate),
+        )
+    _, onnx_metadata = load_and_check_onnx(model_path)
+
     input_samples = onnx_metadata["input"]["shape"][-1]
-    expected_samples = int(segment_seconds * sample_rate)
+    expected_samples = round(segment_seconds * sample_rate)
     if input_samples != expected_samples:
         raise RuntimeError(
             f"Export segment mismatch: ONNX uses {input_samples} samples, "
             f"model metadata requires {expected_samples}"
         )
 
-    real_fixture, real_fixture_metadata = real_audio_fixture(
-        demucs_dir,
-        input_samples,
-        sample_rate,
-    )
     fixtures = {
         "synthetic": synthetic_fixture(input_samples, sample_rate),
-        "official_demucs_test_mp3": real_fixture,
     }
+    real_fixture_metadata: dict[str, Any] | None = None
+    if not args.skip_real_audio_fixture:
+        real_fixture, real_fixture_metadata = real_audio_fixture(
+            demucs_dir,
+            input_samples,
+            sample_rate,
+        )
+        fixtures["official_demucs_test_mp3"] = real_fixture
     session = create_ort_session(model_path)
     parity = run_parity(
         core_model,
@@ -476,6 +598,7 @@ def main() -> int:
         fixtures,
         args.mean_absolute_tolerance,
         args.max_absolute_tolerance,
+        compare_train_segment=args.segment_seconds is not None,
     )
     runtime_output_shape = [1, len(EXPECTED_SOURCES), 2, input_samples]
     for fixture_name, fixture_results in parity.items():
@@ -525,6 +648,10 @@ def main() -> int:
             "segment": {
                 "samples": input_samples,
                 "seconds": segment_seconds,
+                "official_training_seconds": official_segment_seconds,
+                "uses_training_segment_padding": (
+                    args.segment_seconds is None
+                ),
             },
             "overlap": DEFAULT_OVERLAP,
             "logical_stem_order": EXPECTED_SOURCES,
@@ -573,6 +700,16 @@ def main() -> int:
                 "--demucs-dir _deps/demucs "
                 f"--demucs-commit {source['commit']} "
                 "--output-dir model-export-output"
+                + (
+                    f" --segment-seconds {segment_seconds:g}"
+                    if args.segment_seconds is not None
+                    else ""
+                )
+                + (
+                    " --skip-real-audio-fixture"
+                    if args.skip_real_audio_fixture
+                    else ""
+                )
             ),
             "export_date": source["commit_date"].split("T", maxsplit=1)[0],
             "reproducible_timestamp_source": "Demucs commit date",
@@ -584,10 +721,14 @@ def main() -> int:
             "python": platform.python_version(),
             "operating_system": "ubuntu-24.04-x86_64",
             "packages": distribution_versions(),
-            "fixture_decoder": {
-                "ffmpeg": executable_version("ffmpeg"),
-                "ffprobe": executable_version("ffprobe"),
-            },
+            "fixture_decoder": (
+                {
+                    "ffmpeg": executable_version("ffmpeg"),
+                    "ffprobe": executable_version("ffprobe"),
+                }
+                if not args.skip_real_audio_fixture
+                else None
+            ),
             "random_seed": 0,
         },
         "validation": {
@@ -598,6 +739,7 @@ def main() -> int:
             "onnxruntime_execution_mode": "sequential",
             "parity_report": parity_report_path.name,
             "real_audio_fixture": real_fixture_metadata,
+            "real_audio_fixture_skipped": args.skip_real_audio_fixture,
         },
     }
 

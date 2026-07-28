@@ -1,0 +1,489 @@
+#include <QCoreApplication>
+#include <QElapsedTimer>
+#include <QFile>
+#include <QFileInfo>
+#include <QTemporaryDir>
+#include <QThread>
+#include <QVector>
+#include <algorithm>
+#include <atomic>
+#include <functional>
+
+#include "control/controllinpotmeter.h"
+#include "control/controlobject.h"
+#include "control/controlproxy.h"
+#include "mixer/basetrackplayer.h"
+#include "stems/stemlivesessionregistry.h"
+#include "stems/stemstatuscontrolprovider.h"
+#include "test/mixxxtest.h"
+#include "track/track.h"
+
+namespace mixxx::stems {
+namespace {
+
+class FakeDeck final : public BaseTrackPlayer {
+  public:
+    explicit FakeDeck(QString group)
+            : BaseTrackPlayer(nullptr, std::move(group)) {
+    }
+
+    TrackPointer getLoadedTrack() const final {
+        return m_pTrack;
+    }
+
+    void setupEqControls() final {
+    }
+
+    const QUrl& lastAlternateUrl() const {
+        return m_lastAlternateUrl;
+    }
+
+    SINT publishedStemFrameCount() const {
+        return m_publishedStemFrameCount;
+    }
+
+    int loadCount() const {
+        return m_loadCount;
+    }
+
+    void setAlternateAudioSourceResolver(
+            const AlternateAudioSourceResolver& resolver) final {
+        m_resolver = resolver;
+    }
+
+    void publishStemFramesAvailable(
+            SINT readyFrameCount) final {
+        m_publishedStemFrameCount = readyFrameCount;
+    }
+
+    void slotLoadTrack(TrackPointer pTrack,
+            mixxx::StemChannelSelection,
+            bool) final {
+        beginLoadTrack(std::move(pTrack));
+        finishLoadTrack();
+    }
+
+    void beginLoadTrack(TrackPointer pTrack) {
+        ++m_loadCount;
+        const auto pOldTrack = m_pTrack;
+        if (pTrack && m_resolver) {
+            m_lastAlternateUrl = m_resolver(pTrack);
+        }
+        m_pTrack = std::move(pTrack);
+        emit loadingTrack(m_pTrack, pOldTrack);
+    }
+
+    void finishLoadTrack() {
+        if (m_pTrack) {
+            emit newTrackLoaded(m_pTrack);
+        }
+    }
+
+    void slotCloneFromGroup(const QString&) final {
+    }
+
+    void slotCloneDeck() final {
+    }
+
+    void slotEjectTrack(double value) final {
+        if (value > 0.0) {
+            slotLoadTrack({}, {}, false);
+        }
+    }
+
+  private:
+    TrackPointer m_pTrack;
+    AlternateAudioSourceResolver m_resolver;
+    QUrl m_lastAlternateUrl;
+    SINT m_publishedStemFrameCount = 0;
+    int m_loadCount = 0;
+};
+
+class SuccessfulProcessor final
+        : public StemSeparationProcessor {
+  public:
+    Result process(const StemSeparationRequest&,
+            const Callbacks& callbacks) final {
+        callbacks.publishState(StemSeparationState::Preparing);
+        callbacks.publishProgress(0.25F);
+        callbacks.publishState(StemSeparationState::Separating);
+        callbacks.publishProgress(0.75F);
+        callbacks.publishAvailableFrames(44100, 88200);
+        callbacks.publishState(StemSeparationState::Encoding);
+        callbacks.publishState(StemSeparationState::Validating);
+        return {Outcome::Completed, {}};
+    }
+};
+
+class BlockingFirstProcessor final
+        : public StemSeparationProcessor {
+  public:
+    Result process(const StemSeparationRequest&,
+            const Callbacks& callbacks) final {
+        const auto invocation =
+                m_invocationCount.fetch_add(
+                        1, std::memory_order_acq_rel);
+        if (invocation == 0) {
+            m_firstStarted.store(
+                    true, std::memory_order_release);
+            while (!m_releaseFirst.load(
+                    std::memory_order_acquire)) {
+                if (callbacks.cancelled &&
+                        callbacks.cancelled()) {
+                    return {Outcome::Cancelled, {}};
+                }
+                QThread::msleep(1);
+            }
+        }
+        callbacks.publishAvailableFrames(44100, 88200);
+        return {Outcome::Completed, {}};
+    }
+
+    std::atomic_int m_invocationCount{0};
+    std::atomic_bool m_firstStarted{false};
+    std::atomic_bool m_releaseFirst{false};
+};
+
+class CancellableProcessor final
+        : public StemSeparationProcessor {
+  public:
+    void discardCached(const QString&) final {
+        m_discardCount.fetch_add(1, std::memory_order_acq_rel);
+    }
+
+    Result process(const StemSeparationRequest&,
+            const Callbacks& callbacks) final {
+        callbacks.publishState(StemSeparationState::Separating);
+        while (!callbacks.cancelled()) {
+            QThread::msleep(1);
+        }
+        return {Outcome::Cancelled, {}};
+    }
+
+    std::atomic_int m_discardCount{0};
+};
+
+class FailingProcessor final : public StemSeparationProcessor {
+  public:
+    Result process(const StemSeparationRequest&,
+            const Callbacks&) final {
+        return {
+                Outcome::PermanentFailure,
+                QStringLiteral("Synthetic processing failure"),
+        };
+    }
+};
+
+QString createSourceFile(QTemporaryDir* pDirectory) {
+    const auto path =
+            pDirectory->filePath(QStringLiteral("source.wav"));
+    QFile file(path);
+    EXPECT_TRUE(file.open(QIODevice::WriteOnly));
+    EXPECT_EQ(file.write("test audio"), 10);
+    return path;
+}
+
+double controlValue(
+        const QString& group, const QString& item) {
+    return ControlObject::get(ConfigKey(group, item));
+}
+
+bool waitUntil(const std::function<bool()>& predicate,
+        int timeoutMilliseconds = 5000) {
+    QElapsedTimer timer;
+    timer.start();
+    while (!predicate() &&
+            timer.elapsed() < timeoutMilliseconds) {
+        QCoreApplication::processEvents();
+        QThread::msleep(1);
+    }
+    return predicate();
+}
+
+class StemStatusControlProviderTest : public MixxxTest {
+};
+
+TEST_F(StemStatusControlProviderTest,
+        PublishesSuccessfulJobTransitions) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto sourcePath = createSourceFile(&directory);
+    auto pProcessor = std::make_shared<SuccessfulProcessor>();
+    StemStatusControlProvider provider(
+            {
+                    directory.filePath(QStringLiteral("service")),
+                    {},
+                    2,
+                    128000,
+                    false,
+            },
+            pProcessor);
+    ASSERT_TRUE(provider.initialize());
+    FakeDeck deck(QStringLiteral("[Channel71]"));
+    provider.registerDeck(&deck);
+
+    EXPECT_TRUE(ControlObject::exists(ConfigKey(
+            deck.getGroup(), QStringLiteral("separation_trigger"))));
+    EXPECT_DOUBLE_EQ(controlValue(QStringLiteral("[StemSeparation]"),
+                             QStringLiteral("model_available")),
+            1.0);
+
+    QVector<double> observedProgress;
+    ControlProxy percentageProxy(ConfigKey(
+            deck.getGroup(),
+            QStringLiteral("separation_percentage")));
+    ASSERT_TRUE(percentageProxy.valid());
+    percentageProxy.connectValueChanged(
+            &provider,
+            [&](double value) {
+                observedProgress.push_back(value);
+            });
+    deck.slotLoadTrack(
+            Track::newTemporary(sourcePath), {}, false);
+    EXPECT_EQ(QFileInfo(
+                      deck.lastAlternateUrl().toLocalFile())
+                      .suffix(),
+            QStringLiteral("stemlive"));
+
+    ASSERT_TRUE(waitUntil([&] {
+        return controlValue(deck.getGroup(),
+                       QStringLiteral("separation_state")) ==
+                static_cast<double>(StemSeparationState::Ready);
+    }));
+    EXPECT_DOUBLE_EQ(controlValue(deck.getGroup(),
+                             QStringLiteral("separation_percentage")),
+            100.0);
+    EXPECT_DOUBLE_EQ(controlValue(deck.getGroup(),
+                             QStringLiteral("stem_cache_status")),
+            1.0);
+    EXPECT_DOUBLE_EQ(controlValue(QStringLiteral("[StemSeparation]"),
+                             QStringLiteral("queue_size")),
+            0.0);
+    EXPECT_DOUBLE_EQ(controlValue(deck.getGroup(),
+                             QStringLiteral("stem_live_ready")),
+            1.0);
+    EXPECT_EQ(deck.publishedStemFrameCount(), 44100);
+    EXPECT_EQ(deck.loadCount(), 1)
+            << "Publishing live stems must not reload the deck";
+    ASSERT_FALSE(observedProgress.isEmpty());
+    EXPECT_TRUE(std::is_sorted(
+            observedProgress.cbegin(), observedProgress.cend()));
+}
+
+TEST_F(StemStatusControlProviderTest,
+        PublishesPermanentFailureAndErrorCode) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto sourcePath = createSourceFile(&directory);
+    auto pProcessor = std::make_shared<FailingProcessor>();
+    StemStatusControlProvider provider(
+            {
+                    directory.filePath(QStringLiteral("service")),
+                    {},
+                    2,
+                    128000,
+                    false,
+            },
+            pProcessor);
+    ASSERT_TRUE(provider.initialize());
+    FakeDeck deck(QStringLiteral("[Channel73]"));
+    provider.registerDeck(&deck);
+    deck.slotLoadTrack(
+            Track::newTemporary(sourcePath), {}, false);
+
+    ASSERT_TRUE(waitUntil([&] {
+        return controlValue(deck.getGroup(),
+                       QStringLiteral("separation_state")) ==
+                static_cast<double>(StemSeparationState::Failed);
+    }));
+    EXPECT_DOUBLE_EQ(controlValue(deck.getGroup(),
+                             QStringLiteral("separation_error")),
+            4.0);
+    EXPECT_DOUBLE_EQ(controlValue(deck.getGroup(),
+                             QStringLiteral("stem_cache_status")),
+            0.0);
+}
+
+TEST_F(StemStatusControlProviderTest,
+        EnqueuesSecondDeckBeforeAlternateSourceFinishesLoading) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto firstSourcePath =
+            createSourceFile(&directory);
+    const auto secondSourcePath =
+            directory.filePath(QStringLiteral("second.wav"));
+    QFile secondSource(secondSourcePath);
+    ASSERT_TRUE(secondSource.open(QIODevice::WriteOnly));
+    ASSERT_EQ(secondSource.write("second audio"), 12);
+    secondSource.close();
+    auto pProcessor =
+            std::make_shared<BlockingFirstProcessor>();
+    StemStatusControlProvider provider(
+            {
+                    directory.filePath(QStringLiteral("service")),
+                    {},
+                    2,
+                    128000,
+                    false,
+            },
+            pProcessor);
+    ASSERT_TRUE(provider.initialize());
+    FakeDeck firstDeck(QStringLiteral("[Channel74]"));
+    FakeDeck secondDeck(QStringLiteral("[Channel75]"));
+    provider.registerDeck(&firstDeck);
+    provider.registerDeck(&secondDeck);
+
+    firstDeck.slotLoadTrack(
+            Track::newTemporary(firstSourcePath), {}, false);
+    ASSERT_TRUE(waitUntil([&] {
+        return pProcessor->m_firstStarted.load(
+                std::memory_order_acquire);
+    }));
+
+    // Reproduce the real engine load sequence: loadingTrack is emitted, but
+    // newTrackLoaded cannot arrive until the live source has its first chunk.
+    secondDeck.beginLoadTrack(
+            Track::newTemporary(secondSourcePath));
+    ASSERT_TRUE(waitUntil([&] {
+        return pProcessor->m_invocationCount.load(
+                       std::memory_order_acquire) == 2;
+    }));
+    EXPECT_NE(controlValue(secondDeck.getGroup(),
+                      QStringLiteral("separation_state")),
+            static_cast<double>(StemSeparationState::Idle));
+
+    pProcessor->m_releaseFirst.store(
+            true, std::memory_order_release);
+    ASSERT_TRUE(waitUntil([&] {
+        return controlValue(firstDeck.getGroup(),
+                       QStringLiteral("separation_state")) ==
+                static_cast<double>(
+                        StemSeparationState::Ready) &&
+                controlValue(secondDeck.getGroup(),
+                        QStringLiteral("separation_state")) ==
+                static_cast<double>(
+                        StemSeparationState::Ready);
+    }));
+    EXPECT_DOUBLE_EQ(controlValue(secondDeck.getGroup(),
+                             QStringLiteral("stem_live_ready")),
+            1.0);
+    EXPECT_EQ(secondDeck.publishedStemFrameCount(), 44100);
+    EXPECT_EQ(secondDeck.loadCount(), 1);
+}
+
+TEST_F(StemStatusControlProviderTest,
+        LiveDemandTracksDeckPlayPosition) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto sourcePath = createSourceFile(&directory);
+    auto pProcessor = std::make_shared<CancellableProcessor>();
+    StemStatusControlProvider provider(
+            {
+                    directory.filePath(QStringLiteral("service")),
+                    {},
+                    2,
+                    128000,
+                    false,
+            },
+            pProcessor);
+    ASSERT_TRUE(provider.initialize());
+    const auto group = QStringLiteral("[Channel76]");
+    ControlLinPotmeter playPosition(
+            ConfigKey(group, QStringLiteral("playposition")),
+            0.0,
+            1.0,
+            0.0,
+            0.0,
+            true);
+    // ControlPotmeter initializes non-persistent ranges at their midpoint.
+    // Model the position of a freshly loaded deck before observing a seek.
+    playPosition.set(0.0);
+    FakeDeck deck(group);
+    provider.registerDeck(&deck);
+    const auto pTrack = Track::newTemporary(sourcePath);
+    pTrack->setDuration(90.0);
+    deck.slotLoadTrack(pTrack, {}, false);
+
+    const auto sessionId =
+            QFileInfo(deck.lastAlternateUrl().toLocalFile())
+                    .completeBaseName();
+    const auto pLiveSession =
+            StemLiveSessionRegistry::find(sessionId);
+    ASSERT_TRUE(pLiveSession);
+    constexpr std::size_t kSampleRate = 44100;
+    EXPECT_EQ(pLiveSession->requestedFrameCount(),
+            10 * kSampleRate);
+
+    playPosition.set(0.5);
+    ASSERT_TRUE(waitUntil([&] {
+        return pLiveSession->requestedFrameCount() ==
+                55 * kSampleRate;
+    }));
+
+    deck.slotEjectTrack(1.0);
+}
+
+TEST_F(StemStatusControlProviderTest,
+        CancelsActiveJobAndResetsOnTrackChange) {
+    QTemporaryDir directory;
+    ASSERT_TRUE(directory.isValid());
+    const auto sourcePath = createSourceFile(&directory);
+    auto pProcessor = std::make_shared<CancellableProcessor>();
+    StemStatusControlProvider provider(
+            {
+                    directory.filePath(QStringLiteral("service")),
+                    {},
+                    2,
+                    128000,
+                    false,
+            },
+            pProcessor);
+    ASSERT_TRUE(provider.initialize());
+    FakeDeck deck(QStringLiteral("[Channel72]"));
+    provider.registerDeck(&deck);
+    deck.slotLoadTrack(
+            Track::newTemporary(sourcePath), {}, false);
+
+    ASSERT_TRUE(waitUntil([&] {
+        return controlValue(deck.getGroup(),
+                       QStringLiteral("separation_state")) ==
+                static_cast<double>(
+                        StemSeparationState::Separating);
+    }));
+    ControlObject::set(ConfigKey(deck.getGroup(),
+                               QStringLiteral("separation_cancel")),
+            1.0);
+    ASSERT_TRUE(waitUntil([&] {
+        return controlValue(deck.getGroup(),
+                       QStringLiteral("separation_state")) ==
+                static_cast<double>(
+                        StemSeparationState::Cancelled);
+    }));
+
+    const auto secondSourcePath =
+            directory.filePath(QStringLiteral("second.wav"));
+    QFile secondSource(secondSourcePath);
+    ASSERT_TRUE(secondSource.open(QIODevice::WriteOnly));
+    ASSERT_EQ(secondSource.write("second"), 6);
+    secondSource.close();
+    deck.slotLoadTrack(
+            Track::newTemporary(secondSourcePath), {}, false);
+
+    ASSERT_TRUE(waitUntil([&] {
+        return controlValue(deck.getGroup(),
+                       QStringLiteral("separation_state")) ==
+                static_cast<double>(
+                        StemSeparationState::Separating);
+    }));
+    deck.slotEjectTrack(1.0);
+    EXPECT_DOUBLE_EQ(controlValue(deck.getGroup(),
+                             QStringLiteral("separation_state")),
+            static_cast<double>(StemSeparationState::Idle));
+    ASSERT_TRUE(waitUntil([&] {
+        return pProcessor->m_discardCount.load(
+                       std::memory_order_acquire) >= 2;
+    }));
+}
+
+} // namespace
+} // namespace mixxx::stems

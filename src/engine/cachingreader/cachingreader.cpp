@@ -206,7 +206,12 @@ CachingReaderChunkForOwner* CachingReader::lookupChunkAndFreshen(SINT chunkIndex
 
 // Invoked from the UI thread!!
 #ifdef __STEM__
-void CachingReader::newTrack(TrackPointer pTrack, mixxx::StemChannelSelection stemMask) {
+void CachingReader::newTrack(TrackPointer pTrack,
+        mixxx::StemChannelSelection stemMask,
+        QUrl alternateAudioUrl) {
+    m_publishedStemFrameCount.store(0, std::memory_order_release);
+    m_stemPublicationGeneration.fetch_add(
+            1, std::memory_order_release);
 #else
 void CachingReader::newTrack(TrackPointer pTrack) {
 #endif
@@ -225,11 +230,28 @@ void CachingReader::newTrack(TrackPointer pTrack) {
                 << "Loading a new track while loading a track may lead to inconsistent states";
     }
 #ifdef __STEM__
-    m_worker.newTrack(std::move(pTrack), stemMask);
+    m_worker.newTrack(std::move(pTrack),
+            stemMask,
+            std::move(alternateAudioUrl));
 #else
     m_worker.newTrack(std::move(pTrack));
 #endif
 }
+
+#ifdef __STEM__
+void CachingReader::publishStemFramesAvailable(
+        SINT readyFrameCount) {
+    auto current = m_publishedStemFrameCount.load(
+            std::memory_order_relaxed);
+    while (current < readyFrameCount &&
+            !m_publishedStemFrameCount.compare_exchange_weak(
+                    current,
+                    readyFrameCount,
+                    std::memory_order_release,
+                    std::memory_order_relaxed)) {
+    }
+}
+#endif
 
 // Called from the engine thread
 void CachingReader::process() {
@@ -298,6 +320,40 @@ void CachingReader::process() {
             }
         }
     }
+#ifdef __STEM__
+    const auto publicationGeneration =
+            m_stemPublicationGeneration.load(
+                    std::memory_order_acquire);
+    if (publicationGeneration !=
+            m_invalidatedStemPublicationGeneration) {
+        m_invalidatedStemPublicationGeneration =
+                publicationGeneration;
+        m_invalidatedStemFrameCount = 0;
+    }
+    const auto publishedFrameCount =
+            m_publishedStemFrameCount.load(
+                    std::memory_order_acquire);
+    if (publishedFrameCount >
+            m_invalidatedStemFrameCount) {
+        const auto firstChunkIndex =
+                CachingReaderChunk::indexForFrame(
+                        m_invalidatedStemFrameCount);
+        const auto lastChunkIndex =
+                CachingReaderChunk::indexForFrame(
+                        publishedFrameCount - 1);
+        for (auto chunkIndex = firstChunkIndex;
+                chunkIndex <= lastChunkIndex;
+                ++chunkIndex) {
+            auto* const pChunk = lookupChunk(chunkIndex);
+            if (pChunk &&
+                    pChunk->getState() ==
+                            CachingReaderChunkForOwner::READY) {
+                freeChunk(pChunk);
+            }
+        }
+        m_invalidatedStemFrameCount = publishedFrameCount;
+    }
+#endif
 }
 
 CachingReader::ReadResult CachingReader::read(SINT startSample,

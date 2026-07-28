@@ -2069,9 +2069,21 @@ target_include_directories(
   mixxx-lib
   PUBLIC src "${CMAKE_CURRENT_BINARY_DIR}/src"
 )
+option(
+  MIXXX_STEMS_BUILD
+  "Build the independently packaged Mixxx Stems distribution"
+  OFF
+)
+if(MIXXX_STEMS_BUILD)
+  target_compile_definitions(mixxx-lib PUBLIC MIXXX_STEMS_BUILD)
+endif()
 if(UNIX AND NOT APPLE)
   target_sources(mixxx-lib PRIVATE src/util/rlimit.cpp)
-  set(MIXXX_SETTINGS_PATH ".mixxx/")
+  if(MIXXX_STEMS_BUILD)
+    set(MIXXX_SETTINGS_PATH ".mixxx-stems/")
+  else()
+    set(MIXXX_SETTINGS_PATH ".mixxx/")
+  endif()
 endif()
 
 if(APPLE)
@@ -2768,11 +2780,21 @@ endif()
 target_sources(
   mixxx-lib
   PRIVATE
+    src/stems/stemalternatesourcelinker.cpp
+    src/stems/stemalternatesourcelinker.h
     src/stems/stemaudiosourcereader.cpp
     src/stems/stemaudiosourcereader.h
+    src/stems/stemcache.cpp
+    src/stems/stemcache.h
     src/stems/stemchunkpipeline.cpp
     src/stems/stemchunkpipeline.h
+    src/stems/stemtemporarystore.cpp
+    src/stems/stemtemporarystore.h
     src/stems/steminferencerunner.h
+    src/stems/stemmodelmanager.cpp
+    src/stems/stemmodelmanager.h
+    src/stems/stemseparationmanager.cpp
+    src/stems/stemseparationmanager.h
 )
 find_package(onnxruntime CONFIG QUIET)
 if(NOT onnxruntime_FOUND)
@@ -2797,7 +2819,42 @@ if(ONNXRUNTIME)
     PRIVATE src/stems/demucsonnxrunner.cpp src/stems/demucsonnxrunner.h
   )
   target_link_libraries(mixxx-lib PRIVATE onnxruntime::onnxruntime)
-  target_compile_definitions(mixxx-lib PRIVATE MIXXX_USE_ONNXRUNTIME)
+  target_compile_definitions(mixxx-lib PUBLIC MIXXX_USE_ONNXRUNTIME)
+  find_file(
+    onnxruntime_LICENSE_FILE
+    NAMES copyright LICENSE LICENSE.txt
+    HINTS "${ONNXRUNTIME_ROOT}" "$ENV{ONNXRUNTIME_ROOT}" ${CMAKE_PREFIX_PATH}
+    PATH_SUFFIXES share/onnxruntime
+  )
+  if(onnxruntime_LICENSE_FILE)
+    install(
+      FILES "${onnxruntime_LICENSE_FILE}"
+      DESTINATION "${MIXXX_INSTALL_LICENSEDIR}"
+      RENAME ONNXRuntime-LICENSE.txt
+    )
+  elseif(MIXXX_STEMS_BUILD)
+    message(
+      FATAL_ERROR
+      "Mixxx Stems packages require the ONNX Runtime license file"
+    )
+  endif()
+  if(WIN32)
+    get_target_property(_onnxruntime_target_type onnxruntime::onnxruntime TYPE)
+    if(_onnxruntime_target_type STREQUAL "SHARED_LIBRARY")
+      install(
+        IMPORTED_RUNTIME_ARTIFACTS
+          onnxruntime::onnxruntime
+          CONFIGURATIONS
+          RelWithDebInfo
+          Release
+          DESTINATION
+          "${MIXXX_INSTALL_BINDIR}"
+          COMPONENT
+          applocal
+      )
+      set(APPLOCAL_COMPONENT_DEFINED true)
+    endif()
+  endif()
 endif()
 
 # FFmpeg support
@@ -2876,6 +2933,10 @@ if(STEM)
     mixxx-lib
     PRIVATE
       src/sources/soundsourcestem.cpp
+      src/sources/soundsourcestemlive.cpp
+      src/sources/soundsourcestemlive.h
+      src/stems/stemlivesessionregistry.cpp
+      src/stems/stemlivesessionregistry.h
       src/stems/stemcontainerwriter.cpp
       src/stems/stemcontainerwriter.h
       src/track/steminfoimporter.cpp
@@ -2887,6 +2948,16 @@ if(STEM)
     target_sources(
       mixxx-lib
       PRIVATE src/waveform/renderers/allshader/waveformrendererstem.cpp
+    )
+  endif()
+  if(ONNXRUNTIME)
+    target_sources(
+      mixxx-lib
+      PRIVATE
+        src/stems/demucsstemseparationprocessor.cpp
+        src/stems/demucsstemseparationprocessor.h
+        src/stems/stemstatuscontrolprovider.cpp
+        src/stems/stemstatuscontrolprovider.h
     )
   endif()
 endif()
@@ -2990,7 +3061,12 @@ if(BUILD_TESTING)
     src/test/signalpathtest.cpp
     src/test/skincontext_test.cpp
     src/test/softtakeover_test.cpp
+    src/test/stemcachetest.cpp
+    src/test/stemalternatesourcelinkertest.cpp
     src/test/stemchunkpipelinetest.cpp
+    src/test/stemtemporarystoretest.cpp
+    src/test/stemmodelmanagertest.cpp
+    src/test/stemseparationmanagertest.cpp
     src/test/soundproxy_test.cpp
     src/test/soundsourceproviderregistrytest.cpp
     src/test/sqliteliketest.cpp
@@ -3020,7 +3096,12 @@ if(BUILD_TESTING)
       src/test/steminfotest.cpp
       src/test/stemcontrolobjecttest.cpp
       src/test/stemcontainerwritertest.cpp
+      src/test/soundsourcestemlivetest.cpp
+      src/test/stemskinvalidationtest.cpp
     )
+    if(ONNXRUNTIME)
+      list(APPEND src-mixxx-test src/test/stemstatuscontrolprovidertest.cpp)
+    endif()
   endif()
   if(BUILD_BENCH)
     set(
@@ -5461,16 +5542,28 @@ configure_file(
 )
 
 # Packaging
-set(CPACK_PACKAGE_NAME "Mixxx")
-set(CPACK_PACKAGE_VENDOR "Mixxx Project")
+if(MIXXX_STEMS_BUILD)
+  set(CPACK_PACKAGE_NAME "Mixxx Stems")
+  set(CPACK_PACKAGE_VENDOR "Mixxx Stems Project")
+  set(
+    CPACK_PACKAGE_DESCRIPTION_SUMMARY
+    "Digital DJ application with local stem separation"
+  )
+  set(CPACK_PACKAGE_INSTALL_DIRECTORY "Mixxx Stems")
+  set(CPACK_PACKAGE_EXECUTABLES "mixxx;Mixxx Stems")
+  set(CPACK_DEBIAN_PACKAGE_NAME "mixxx-stems")
+else()
+  set(CPACK_PACKAGE_NAME "Mixxx")
+  set(CPACK_PACKAGE_VENDOR "Mixxx Project")
+  set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Digital DJ Application")
+  set(CPACK_PACKAGE_INSTALL_DIRECTORY "Mixxx")
+  set(CPACK_PACKAGE_EXECUTABLES "mixxx;Mixxx")
+endif()
 set(CPACK_PACKAGE_CONTACT "RJ Skerry-Ryan <rryan@mixxx.org>")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Digital DJ Application")
 set(
   CPACK_PACKAGE_DESCRIPTION_FILE
   "${CMAKE_CURRENT_SOURCE_DIR}/packaging/CPackPackageDescription.txt"
 )
-set(CPACK_PACKAGE_INSTALL_DIRECTORY "Mixxx")
-set(CPACK_PACKAGE_EXECUTABLES "mixxx;Mixxx")
 set(CPACK_PACKAGE_ICON "${CMAKE_SOURCE_DIR}/res/images/mixxx_install_logo.bmp")
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://www.mixxx.org/")
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
@@ -5478,6 +5571,7 @@ set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 set(CPACK_STRIP_FILES ON)
 set(CPACK_CREATE_DESKTOP_LINKS "mixxx")
 set(CPACK_MIXXX_VERSION "${MIXXX_VERSION}")
+set(CPACK_MIXXX_STEMS_BUILD "${MIXXX_STEMS_BUILD}")
 # Save GIT values just in case they have been set manual via cmake
 set(CPACK_GIT_DESCRIBE "${GIT_DESCRIBE}")
 if(CMAKE_SYSTEM_PROCESSOR)
@@ -5505,7 +5599,9 @@ else()
   set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "qttranslations5-l10n")
 endif()
 set(CPACK_DEBIAN_PACKAGE_SUGGESTS "pdf-viewer, pulseaudio-utils")
-set(CPACK_DEBIAN_PACKAGE_REPLACES "mixxx-data")
+if(NOT MIXXX_STEMS_BUILD)
+  set(CPACK_DEBIAN_PACKAGE_REPLACES "mixxx-data")
+endif()
 
 set(CPACK_DEBIAN_PACKAGE_DEPENDS "")
 list(APPEND CPACK_DEBIAN_PACKAGE_DEPENDS "fonts-open-sans")
@@ -5596,7 +5692,13 @@ set(
 
 # Use WiX toolset version >= 4.0 for building Windows installers.
 set(CPACK_WIX_VERSION 4)
-set(CPACK_WIX_UPGRADE_GUID "921DC99C-4DCF-478D-B950-50685CB9E6BE")
+if(MIXXX_STEMS_BUILD)
+  # This identity deliberately differs from official Mixxx so both MSI
+  # products can be installed and upgraded independently.
+  set(CPACK_WIX_UPGRADE_GUID "A755E68D-9C1B-4E37-AB72-40727C58DA31")
+else()
+  set(CPACK_WIX_UPGRADE_GUID "921DC99C-4DCF-478D-B950-50685CB9E6BE")
+endif()
 set(
   CPACK_WIX_LICENSE_RTF
   "${CMAKE_CURRENT_BINARY_DIR}/packaging/wix/LICENSE.rtf"
@@ -5650,6 +5752,15 @@ if(WIN32)
   set(
     CPACK_WIX_PATCH_FILE
     "${CMAKE_CURRENT_BINARY_DIR}/packaging/wix/MixxxUpgradePatch.xml"
+  )
+  configure_file(
+    cmake/modules/RemoveDuplicateOnnxRuntimeForWix.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/RemoveDuplicateOnnxRuntimeForWix.cmake"
+    @ONLY
+  )
+  set(
+    CPACK_PRE_BUILD_SCRIPTS
+    "${CMAKE_CURRENT_BINARY_DIR}/RemoveDuplicateOnnxRuntimeForWix.cmake"
   )
 
   # uses CMAKE_PROJECT_VERSION
