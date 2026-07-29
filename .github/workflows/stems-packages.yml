@@ -4,6 +4,20 @@ name: Mixxx Stems packages
 
 on:
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Package target to build
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - windows-x64
+          - ubuntu-arm64
+      release_version:
+        description: Optional Stems release version (for example 0.2.2)
+        required: false
+        type: string
   pull_request:
     branches:
       - stems-integration
@@ -19,6 +33,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
+  GIT_DESCRIBE_ARG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_version != '' && format('-DGIT_DESCRIBE=stems-v{0}', inputs.release_version) || '' }}
   HTDEMUCS_SHA256: db37d1314ac1e1051e7978d25ef45b3f1d3f43c837678752f592c0f2deca752d
   HTDEMUCS_TAG: htdemucs-955717e8-onnx-v1
   VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg-binary-cache,readwrite
@@ -28,6 +43,7 @@ env:
 jobs:
   windows-x64:
     name: Windows x64 MSI and portable ZIP
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'windows-x64'
     runs-on: windows-2025
     timeout-minutes: 240
     env:
@@ -121,6 +137,7 @@ jobs:
           -B build
           -DCMAKE_BUILD_TYPE=RelWithDebInfo
           -DMIXXX_STEMS_BUILD=ON
+          ${{ env.GIT_DESCRIBE_ARG }}
           -DONNXRUNTIME=ON
           -DSTEM=ON
           -DBULK=ON
@@ -264,8 +281,12 @@ jobs:
             throw "Release MSI unexpectedly contains mixxx.pdb"
           }
 
+          $releaseVersion = "${{ inputs.release_version }}"
           if ("${{ github.ref }}" -like "refs/tags/stems-v*") {
-            $tagVersion = "${{ github.ref_name }}".Substring(7).Split(".")
+            $releaseVersion = "${{ github.ref_name }}".Substring(7)
+          }
+          if ($releaseVersion) {
+            $tagVersion = $releaseVersion.Split(".")
             if ($tagVersion.Count -ne 3) {
               throw "Invalid Stems release tag"
             }
@@ -343,6 +364,7 @@ jobs:
 
   ubuntu-arm64:
     name: Ubuntu ARM64 DEB
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'ubuntu-arm64'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 240
     env:
@@ -398,6 +420,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=RelWithDebInfo
           -DCMAKE_PREFIX_PATH=${{ github.workspace }}/_deps/vcpkg/installed/arm64-linux-release
           -DMIXXX_STEMS_BUILD=ON
+          ${{ env.GIT_DESCRIBE_ARG }}
           -DONNXRUNTIME=ON
           -DSTEM=ON
           -DQT6=ON
