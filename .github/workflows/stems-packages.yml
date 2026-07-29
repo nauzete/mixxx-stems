@@ -263,6 +263,17 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
           }
+          Get-ChildItem `
+            -Path "${{ github.workspace }}\build\portable" `
+            -Recurse -File -Filter *.pdb |
+            Remove-Item -Force
+          if (
+            Get-ChildItem `
+              -Path "${{ github.workspace }}\build\portable" `
+              -Recurse -File -Filter *.pdb
+          ) {
+            throw "Portable package still contains PDB files"
+          }
           Compress-Archive `
             -Path "${{ github.workspace }}\build\portable\*" `
             -DestinationPath "${{ github.workspace }}\build\Mixxx-Stems-x64-portable.zip"
