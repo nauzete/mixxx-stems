@@ -221,8 +221,36 @@ jobs:
       - name: Create MSI and portable ZIP
         shell: pwsh
         run: |
+          $cpackArguments = @(
+            "-G", "WIX",
+            "-V",
+            "-D", "CPACK_COMPONENTS_ALL=Unspecified;applocal"
+          )
+          $releaseVersion = "${{ inputs.release_version }}"
+          if ("${{ github.ref }}" -like "refs/tags/stems-v*") {
+            $releaseVersion = "${{ github.ref_name }}".Substring(7)
+          }
+          if ($releaseVersion) {
+            $tagVersion = $releaseVersion.Split(".")
+            if ($tagVersion.Count -ne 3) {
+              throw "Invalid Stems release tag"
+            }
+            $msiBuild =
+              [int]$tagVersion[0] * 10000 +
+              [int]$tagVersion[1] * 100 +
+              [int]$tagVersion[2]
+            if ($msiBuild -gt 65535) {
+              throw "Stems release version exceeds the MSI build limit"
+            }
+            $cpackArguments += @(
+              "-D", "CPACK_PACKAGE_VERSION=2.7.$msiBuild",
+              "-D", "CPACK_PACKAGE_VERSION_MAJOR=2",
+              "-D", "CPACK_PACKAGE_VERSION_MINOR=7",
+              "-D", "CPACK_PACKAGE_VERSION_PATCH=$msiBuild"
+            )
+          }
           Push-Location build
-          cpack -G WIX -V -D "CPACK_COMPONENTS_ALL=Unspecified;applocal"
+          cpack @cpackArguments
           $cpackExitCode = $LASTEXITCODE
           Pop-Location
           if ($cpackExitCode -ne 0) {
