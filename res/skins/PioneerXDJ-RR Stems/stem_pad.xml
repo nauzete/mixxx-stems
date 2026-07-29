@@ -1,0 +1,49 @@
+<Template>
+  <WidgetGroup>
+    <ObjectName>StemPadStack</ObjectName>
+    <Layout>stacked</Layout>
+    <Size>50me,27max</Size>
+    <Children>
+      <PushButton>
+        <ObjectName><Variable name="objectName"/></ObjectName>
+        <Size>50me,27max</Size>
+        <NumberStates>2</NumberStates>
+        <State><Number>0</Number><Text><Variable name="label"/></Text></State>
+        <State><Number>1</Number><Text><Variable name="label"/></Text></State>
+        <Connection>
+          <ConfigKey>[Channel<Variable name="channel"/>_Stem<Variable name="stem"/>],mute</ConfigKey>
+          <Transform><Not/></Transform>
+          <ButtonState>LeftButton</ButtonState>
+        </Connection>
+        <Connection>
+          <ConfigKey>[Channel<Variable name="channel"/>],stem_active_mode</ConfigKey>
+          <Transform><Not/></Transform>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+        <Connection>
+          <ConfigKey>[Channel<Variable name="channel"/>],stem_live_ready</ConfigKey>
+          <BindProperty>enabled</BindProperty>
+        </Connection>
+      </PushButton>
+      <PushButton>
+        <ObjectName><Variable name="objectName"/></ObjectName>
+        <Size>50me,27max</Size>
+        <NumberStates>2</NumberStates>
+        <State><Number>0</Number><Text><Variable name="label"/></Text></State>
+        <State><Number>1</Number><Text><Variable name="label"/></Text></State>
+        <Connection>
+          <ConfigKey>[Channel<Variable name="channel"/>_Stem<Variable name="stem"/>],solo</ConfigKey>
+          <ButtonState>LeftButton</ButtonState>
+        </Connection>
+        <Connection>
+          <ConfigKey>[Channel<Variable name="channel"/>],stem_active_mode</ConfigKey>
+          <BindProperty>visible</BindProperty>
+        </Connection>
+        <Connection>
+          <ConfigKey>[Channel<Variable name="channel"/>],stem_live_ready</ConfigKey>
+          <BindProperty>enabled</BindProperty>
+        </Connection>
+      </PushButton>
+    </Children>
+  </WidgetGroup>
+</Template>

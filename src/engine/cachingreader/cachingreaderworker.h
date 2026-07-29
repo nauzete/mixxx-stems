@@ -2,6 +2,7 @@
 
 #include <QMutex>
 #include <QString>
+#include <QUrl>
 
 #include "audio/frame.h"
 #include "audio/types.h"
@@ -105,7 +106,9 @@ class CachingReaderWorker : public EngineWorker {
 
     // Request to load a new track. wake() must be called afterwards.
 #ifdef __STEM__
-    void newTrack(TrackPointer pTrack, mixxx::StemChannelSelection stemMask);
+    void newTrack(TrackPointer pTrack,
+            mixxx::StemChannelSelection stemMask,
+            QUrl alternateAudioUrl = {});
 #else
     void newTrack(TrackPointer pTrack);
 #endif
@@ -130,6 +133,7 @@ class CachingReaderWorker : public EngineWorker {
     struct NewTrackRequest {
         TrackPointer track;
         mixxx::StemChannelSelection stemMask;
+        QUrl alternateAudioUrl;
     };
 #endif
     const QString m_group;
@@ -162,7 +166,9 @@ class CachingReaderWorker : public EngineWorker {
 
     /// Internal method to load a track. Emits trackLoaded when finished.
 #ifdef __STEM__
-    void loadTrack(const TrackPointer& pTrack, mixxx::StemChannelSelection stemMask);
+    void loadTrack(const TrackPointer& pTrack,
+            mixxx::StemChannelSelection stemMask,
+            const QUrl& alternateAudioUrl);
 #else
     void loadTrack(const TrackPointer& pTrack);
 #endif

@@ -202,6 +202,32 @@ TEST_F(SoundSourceProxyTest, open) {
     }
 }
 
+#ifdef __STEM__
+TEST_F(SoundSourceProxyTest,
+        alternateAudioSourceRetainsLogicalTrack) {
+    const auto logicalFilePath =
+            getTestFile(QStringLiteral(".flac"));
+    const auto alternateFilePath =
+            getTestFile(QStringLiteral(".ogg"));
+    auto pTrack = Track::newTemporary(logicalFilePath);
+    pTrack->setTitle(QStringLiteral("Original library metadata"));
+
+    SoundSourceProxy proxy(
+            pTrack, QUrl::fromLocalFile(alternateFilePath));
+    EXPECT_EQ(proxy.getTrack(), pTrack);
+    EXPECT_EQ(proxy.getUrl(),
+            QUrl::fromLocalFile(alternateFilePath));
+
+    auto pAudioSource = proxy.openAudioSource();
+
+    ASSERT_TRUE(pAudioSource);
+    EXPECT_EQ(pTrack->getLocation(), logicalFilePath);
+    EXPECT_EQ(pTrack->getTitle(),
+            QStringLiteral("Original library metadata"));
+    pAudioSource->close();
+}
+#endif
+
 TEST_F(SoundSourceProxyTest, openEmptyFile) {
     const QStringList fileNameSuffixes = getFileNameSuffixes();
 
@@ -764,6 +790,7 @@ TEST_F(SoundSourceProxyTest, firstSoundTest) {
     struct RefFirstSound {
         QString path;
         SINT firstSoundSample;
+        SINT fpmDefaultFirstSoundSample = -1;
     };
 
     RefFirstSound refs[] = {{QStringLiteral("cover-test-øé~ł€˚.aiff"), 1166},
@@ -808,11 +835,12 @@ TEST_F(SoundSourceProxyTest, firstSoundTest) {
 
             {QStringLiteral("cover-test-øé~ł€˚-vbr.mp3"),
 #if defined(__LINUX__) || defined(__WINDOWS__)
-                    3376}, // MAD: MPEG Audio Decoder 0.15.1 (beta) NDEBUG FPM_64BIT
+                    3376,
+                    3326}, // MAD: MPEG Audio Decoder 0.15.1 (beta)
+                           // NDEBUG FPM_64BIT / FPM_DEFAULT
 #else
                     2318}, // CoreAudio Version 11.7.8 (Build 20G1351)
 #endif
-            // 3326 MAD: MPEG Audio Decoder 0.15.1 (beta) NDEBUG FPM_DEFAULT
             // No offset compared to FPM_64BIT builds but rounding differences
             // https://github.com/mixxxdj/mixxx/issues/11888
             // 1166 FFmpeg
@@ -873,11 +901,17 @@ TEST_F(SoundSourceProxyTest, firstSoundTest) {
 
                 const SINT firstSoundSample = AnalyzerSilence::findFirstSoundInChunk(samples);
                 if (firstSoundSample < static_cast<SINT>(samples.size())) {
-                    EXPECT_EQ(firstSoundSample, ref.firstSoundSample)
+                    const auto providerDisplayName =
+                            providerRegistration.getProvider()->getDisplayName();
+                    const SINT expectedFirstSoundSample =
+                            ref.fpmDefaultFirstSoundSample >= 0 &&
+                                    providerDisplayName.contains(
+                                            QStringLiteral("FPM_DEFAULT"))
+                            ? ref.fpmDefaultFirstSoundSample
+                            : ref.firstSoundSample;
+                    EXPECT_EQ(firstSoundSample, expectedFirstSoundSample)
                             << filePath.toStdString() << " "
-                            << providerRegistration.getProvider()
-                                       ->getDisplayName()
-                                       .toStdString();
+                            << providerDisplayName.toStdString();
                     break;
                 }
             }
@@ -1120,8 +1154,9 @@ TEST_F(SoundSourceProxyTest, taglibStringToEnumFileType) {
     const QStringList fileTypes = SoundSourceProxy::getSupportedFileTypes();
     for (const auto& fileType : fileTypes) {
         qDebug() << fileType;
-        if (fileType != "okt" &&     // Oktalyzer
-                fileType != "stm") { // "Scream Tracker";
+        if (fileType != "okt" &&          // Oktalyzer
+                fileType != "stm" &&      // Scream Tracker
+                fileType != "stemlive") { // Internal live-stem source
             ASSERT_NE(mixxx::taglib::stringToEnumFileType(fileType),
                     mixxx::taglib::FileType::Unknown);
         }

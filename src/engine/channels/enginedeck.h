@@ -101,8 +101,11 @@ class EngineDeck : public EngineChannel, public AudioDestination {
     // Stem buffer used to retrieve all the channel to mix together
     mixxx::SampleBuffer m_stemBuffer;
     std::unique_ptr<ControlObject> m_pStemCount;
+    std::unique_ptr<ControlObject> m_pStemLiveReady;
+    std::unique_ptr<ControlPushButton> m_pStemActiveMode;
     std::vector<std::unique_ptr<ControlPotmeter>> m_stemGain;
     std::vector<std::unique_ptr<ControlPushButton>> m_stemMute;
+    std::vector<std::unique_ptr<ControlPushButton>> m_stemSolo;
     std::vector<std::unique_ptr<EngineVuMeter>> m_stemVuMeter;
     bool m_stemClonedState;
 #endif

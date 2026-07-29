@@ -1,5 +1,6 @@
 #include "mixer/playermanager.h"
 
+#include <QDir>
 #include <QRegularExpression>
 
 #include "audio/types.h"
@@ -18,6 +19,9 @@
 #include "moc_playermanager.cpp"
 #include "preferences/dialog/dlgprefdeck.h"
 #include "soundio/soundmanager.h"
+#if defined(__STEM__) && defined(MIXXX_USE_ONNXRUNTIME)
+#include "stems/stemstatuscontrolprovider.h"
+#endif
 #include "track/track.h"
 #include "util/assert.h"
 #include "util/compatibility/qatomic.h"
@@ -115,6 +119,22 @@ PlayerManager::PlayerManager(UserSettingsPointer pConfig,
                   ConfigKey(kAppGroup, QStringLiteral("num_microphones")), true, true)),
           m_pCONumAuxiliaries(std::make_unique<ControlObject>(
                   ConfigKey(kAppGroup, QStringLiteral("num_auxiliaries")), true, true)),
+#if defined(__STEM__) && defined(MIXXX_USE_ONNXRUNTIME)
+          m_pStemStatusControlProvider(
+                  std::make_unique<
+                          mixxx::stems::StemStatusControlProvider>(
+                          mixxx::stems::
+                                  StemStatusControlProvider::Settings{
+                                          QDir(m_pConfig->getSettingsPath())
+                                                  .filePath(
+                                                          QStringLiteral(
+                                                                  "stems")),
+                                          {},
+                                          2,
+                                          128000,
+                                          true,
+                                  })),
+#endif
           m_pTrackAnalysisScheduler(TrackAnalysisScheduler::NullPointer()) {
     m_pCONumDecks->addAlias(ConfigKey(kLegacyGroup, QStringLiteral("num_decks")));
     m_pCONumDecks->connectValueChangeRequest(this,
@@ -131,6 +151,16 @@ PlayerManager::PlayerManager(UserSettingsPointer pConfig,
     m_pCONumAuxiliaries->addAlias(ConfigKey(kLegacyGroup, QStringLiteral("num_auxiliaries")));
     m_pCONumAuxiliaries->connectValueChangeRequest(this,
             &PlayerManager::slotChangeNumAuxiliaries, Qt::DirectConnection);
+
+#if defined(__STEM__) && defined(MIXXX_USE_ONNXRUNTIME)
+    QString stemServiceError;
+    if (!m_pStemStatusControlProvider->initialize(
+                &stemServiceError)) {
+        kLogger.warning()
+                << "Failed to initialize stem separation service:"
+                << stemServiceError;
+    }
+#endif
 
     // This is parented to the PlayerManager so does not need to be deleted
     m_pSamplerBank = new SamplerBank(m_pConfig, this);
@@ -344,6 +374,9 @@ void PlayerManager::addDeckInner() {
             m_pEffectsManager,
             deckIndex % 2 == 1 ? EngineChannel::RIGHT : EngineChannel::LEFT,
             handleGroup);
+#if defined(__STEM__) && defined(MIXXX_USE_ONNXRUNTIME)
+    m_pStemStatusControlProvider->registerDeck(pDeck);
+#endif
     connect(pDeck->getEngineDeck(),
             &EngineDeck::noPassthroughInputConfigured,
             this,

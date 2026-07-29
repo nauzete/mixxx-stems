@@ -1,0 +1,709 @@
+/* =================================================================
+   PioneerXDJ-RR Skin  |  style.qss  v10
+   Fuentes proporcionales — sin solapamiento
+   ================================================================= */
+
+/* ── BASE ──────────────────────────────────────────────────────── */
+#Mixxx {
+  background-color: #000;
+  font-family: 'Open Sans', 'Noto Sans', 'DejaVu Sans', sans-serif;
+  font-size: 11pt;
+  color: #d0d0d0;
+}
+* {
+  font-family: 'Open Sans', 'Noto Sans', 'DejaVu Sans', sans-serif;
+  font-size: 11pt;
+  color: #d0d0d0;
+}
+QMenuBar, QMenu {
+  background-color: #111; color: #888;
+}
+QMenuBar::item:pressed, QMenu::item:selected {
+  background-color: rgba(255,255,255,0.15);
+}
+
+/* ── BOTONES BASE ──────────────────────────────────────────────── */
+WPushButton {
+  background-color: #0d0d0d;
+  border: 1px solid #2a2a2a;
+  border-radius: 2px;
+  color: #888;
+  outline: none;
+  padding: 1px 2px;
+  font-size: 10pt;
+}
+WPushButton:hover {
+  color: #ccc;
+  border-color: #444;
+  background-color: #161616;
+}
+WPushButton[value="1"] {
+  color: #e0e0e0;
+  border-color: #555;
+  background-color: #252525;
+}
+
+/* ── TOPBAR ────────────────────────────────────────────────────── */
+#Topbar {
+  background-color: #000;
+  border-bottom: 1px solid #1a1a1a;
+}
+#TopStatusBar {
+  background-color: #0a0a0a;
+  padding: 0 8px;
+}
+#TopUtilityLabel {
+  color: #444;
+  font-size: 8pt;
+  letter-spacing: 1px;
+}
+
+/* TABS — borde amarillo-verde cuando activo */
+#TabControls {
+  background-color: #000;
+  padding: 4px 6px 0 6px;
+}
+#TabControls WPushButton {
+  background-color: #000;
+  border: 2px solid #2a2a2a;
+  color: #2a2a2a;
+  font-size: 11pt;
+  font-weight: 800;
+  letter-spacing: 1px;
+  margin: 0 5px;
+  min-height: 30px;
+  padding: 2px 12px;
+  text-transform: uppercase;
+  border-radius: 2px;
+}
+#TabControls WPushButton:hover { border-color: #555; color: #777; }
+#TabControls WPushButton[value="1"] {
+  border: 2px solid #c3d541;
+  color: #c3d541;
+  background-color: #0c0e00;
+}
+
+/* ── WAVEFORM INFO (panel lateral izq) ────────────────────────── */
+#StemActiveModeGroup { padding: 0 2px; }
+#StemActiveModeLabel {
+  color: #777;
+  font-size: 7pt;
+  font-weight: 800;
+  qproperty-alignment: 'AlignHCenter | AlignVCenter';
+}
+#StemActiveModeButton {
+  background-color: #17171c;
+  border: 1px solid #555;
+  color: #ddd;
+  font-size: 8pt;
+  font-weight: 900;
+}
+#StemActiveModeButton[displayValue="1"] {
+  background-color: #382052;
+  border-color: #a86ee0;
+  color: #e4c5ff;
+}
+#StemThreadsGroup { padding: 0 2px; }
+#StemThreadsLabel {
+  color: #777;
+  font-size: 7pt;
+  font-weight: 800;
+  qproperty-alignment: 'AlignHCenter | AlignVCenter';
+}
+#StemThreadsButton {
+  background-color: #17171c;
+  border: 1px solid #555;
+  color: #ddd;
+  font-size: 10pt;
+  font-weight: 900;
+}
+#StemThreadsValue {
+  background-color: #09090d;
+  border: 1px solid #333;
+  color: #eee;
+  font-size: 9pt;
+  font-weight: 900;
+  qproperty-alignment: 'AlignHCenter | AlignVCenter';
+}
+
+#WaveformInfo {
+  background-color: #0a0a10;
+  border-right: 1px solid #1a1a28;
+  padding: 2px;
+}
+#WaveformInfo_Header {
+  background-color: #1a1a28;
+  padding: 2px 4px;
+}
+#WaveformInfo_Header[highlight="1"] {
+  background-color: #1a2840;
+  border: 2px solid #e0e0e0;
+}
+#WaveformInfo_Title {
+  font-size: 12pt;
+  font-weight: 800;
+  color: #e0e0e0;
+  text-transform: uppercase;
+}
+#DeckPlayingLeft {
+  color: #d73535;
+  font-size: 11pt;
+  font-weight: 800;
+  margin-right: 2px;
+}
+#WaveformInfo_USB { font-size: 10pt; font-weight: 700; color: #c3d541; }
+#WaveformInfo_USBIcon { font-size: 9pt; color: #c3d541; }
+#WaveformInfo_Key { font-size: 12pt; font-weight: 800; color: #e0e0e0; text-transform: uppercase; }
+#WaveformInfo_Key_Icon {
+  background-color: #e0e0e0;
+  border-radius: 2px; color: #000;
+  font-size: 9pt; margin: 2px 3px; padding: 0 1px;
+}
+#WaveformInfo_Loop_Icon { color: #6ee128; font-size: 14pt; }
+#WaveformInfo_StemPads { padding: 2px 1px 0 1px; }
+#StemPadStack { padding: 1px; }
+#StemPadDrums, #StemPadVocal, #StemPadBass, #StemPadOther {
+  background-color: #17171c;
+  border: 1px solid #383840;
+  color: #777;
+  font-size: 7pt;
+  font-weight: 900;
+}
+#StemPadDrums:disabled, #StemPadVocal:disabled,
+#StemPadBass:disabled, #StemPadOther:disabled {
+  background-color: #151519;
+  border-color: #29292f;
+  color: #555;
+}
+#StemPadDrums:enabled { border-color: #278b45; color: #48d273; }
+#StemPadDrums:enabled[displayValue="1"] { background-color: #174d28; color: #8dffad; }
+#StemPadVocal:enabled { border-color: #287ac8; color: #4aa9ff; }
+#StemPadVocal:enabled[displayValue="1"] { background-color: #174873; color: #a7d8ff; }
+#StemPadBass:enabled { border-color: #ad3939; color: #ef5a5a; }
+#StemPadBass:enabled[displayValue="1"] { background-color: #681f25; color: #ffaaaa; }
+#StemPadOther:enabled { border-color: #783eb5; color: #b573ef; }
+#StemPadOther:enabled[displayValue="1"] { background-color: #4a276d; color: #dfb5ff; }
+WBeatSpinBox {
+  color: #fff; font-size: 11pt; font-weight: 700;
+  background-color: #000;
+}
+WBeatSpinBox::down-button, WBeatSpinBox::up-button,
+WBeatSpinBox::down-arrow, WBeatSpinBox::up-arrow { width:0;height:0;background:#000;color:#000; }
+
+/* ── DECK PANEL ────────────────────────────────────────────────── */
+#Deck { background-color: #000; padding: 2px; }
+#Deck[highlight="1"] { border: 1px solid #3a3a4a; }
+
+/* Título */
+#DeckHeader { background-color: #0d1428; padding: 2px 4px; }
+#DeckTitleNote { font-size: 12pt; color: #888; }
+#DeckTitle { font-size: 11pt; font-weight: 700; color: #e8e8e8; }
+#DeckEjectButton {
+  background-color: #151519;
+  border: 1px solid #4b4b55;
+  color: #aaa;
+  font-size: 7pt;
+  font-weight: 800;
+}
+#DeckEjectButton:hover { border-color: #d45a5a; color: #ff8a8a; }
+
+/* Info row */
+#DeckInfo { background-color: #050508; padding: 2px; }
+#DeckChannelTitle { font-size: 11pt; font-weight: 800; color: #c3d541; letter-spacing: 1px; }
+#TrackNumberTitle { font-size: 8pt; color: #555; text-transform: uppercase; }
+#TrackNumber { font-size: 11pt; font-weight: 700; color: #e0e0e0; }
+#BPMRangePlusMinus { font-size: 11pt; color: #888; }
+#RateDisplay { font-size: 10pt; color: #888; }
+#BPMPercent { font-size: 9pt; color: #666; }
+#DeckTempoTitle { font-size: 8pt; color: #555; text-transform: uppercase; }
+
+/* BPM box */
+#DeckBPMWrapper {
+  border: 2px solid #e0e0e0;
+  border-radius: 3px;
+  padding: 1px 3px;
+}
+#DeckBPM { font-size: 14pt; font-weight: 900; color: #fff; }
+#DeckBPMTitle { font-size: 7pt; color: #aaa; }
+
+/* Hot Cue / Auto Cue */
+#HotCueActivate {
+  font-size: 9pt; font-weight: 700;
+  color: #d73535; background-color: #1a0a0a;
+  border: 1px solid #3a1010; border-radius: 2px;
+}
+#HotCueActivate[value="1"] { background-color: #cc2200; color: #fff; border-color: #ff3300; }
+#AutoCueButton {
+  font-size: 9pt; font-weight: 700;
+  color: #888; background-color: #111;
+  border: 1px solid #222; border-radius: 2px;
+}
+#AutoCueButton[value="1"] { background-color: #cc8800; color: #000; border-color: #ffaa00; }
+
+/* Mini waveform Overview dentro de deck */
+#DeckOverview { background-color: #000; }
+#DeckOverviewTopContainer { background-color: #000; }
+
+/* TIEMPO GRANDE */
+#DeckTimeRow {
+  background-color: #000005;
+  border-top: 1px solid #1a1a28;
+  border-bottom: 1px solid #1a1a28;
+  padding: 1px 4px;
+}
+#RemainLabelGroup { padding: 2px 6px 2px 2px; }
+#RemainStaticLabel { font-size: 10pt; font-weight: 800; color: #c3d541; text-transform: uppercase; }
+#ElapsedStaticLabel { font-size: 8pt; color: #444; text-transform: uppercase; }
+
+WNumberPos#DeckTrackTime {
+  font-size: 22pt;
+  font-weight: 900;
+  color: #ffffff;
+}
+WNumberPos#DeckTrackTime[highlight="1"] { color: #aaaaaa; }
+
+/* ── TRANSPORT ─────────────────────────────────────────────────── */
+#DeckTransport {
+  background-color: #050505;
+  border-top: 1px solid #1a1a1a;
+  padding: 2px 2px;
+}
+#DeckTransport WPushButton { font-size: 9pt; font-weight: 700; }
+
+#SyncButton { background:#060c18; color:#2244aa; border:1px solid #101830; }
+#SyncButton[value="1"] { background:#0a1e66; color:#fff; border:1px solid #2255cc; }
+
+#CueButton { background:#140a00; color:#7a4a00; border:1px solid #2a1800; }
+#CueButton[value="1"] { background:#eb870f; color:#000; border:1px solid #ffaa44; }
+
+#PlayButton { background:#041004; color:#2a6a1a; border:1px solid #0c2008; font-size:10pt; }
+#PlayButton[value="1"] { background:#6ee128; color:#000; border:1px solid #8fff40; }
+
+#LoopInButton, #LoopOutButton { background:#04100e; color:#1a5a50; border:1px solid #0a2820; }
+#LoopInButton[value="1"], #LoopOutButton[value="1"] { background:#0066ff; color:#fff; border:1px solid #3399ff; }
+
+#ReloopButton { background:#04100e; color:#1a5a50; border:1px solid #0a2820; }
+#ReloopButton[value="1"] { background:#0088cc; color:#fff; border:1px solid #00bbff; }
+
+#LoopHalveButton, #LoopDoubleButton { font-size:12pt; color:#666; background:#0d0d0d; border:1px solid #1e1e1e; }
+#LoopHalveButton:hover, #LoopDoubleButton:hover { color:#bbb; }
+
+#LoopSizeSpinBox { background:#0a0a14; color:#0ddcf2; font-size:9pt; font-weight:700; border:1px solid #1a1a28; }
+
+#KillHighButton { background:#120404; color:#662020; border:1px solid #280808; }
+#KillHighButton[value="1"] { background:#cc0000; color:#fff; border:1px solid #ff4444; }
+#KillMidButton  { background:#040c04; color:#206620; border:1px solid #081808; }
+#KillMidButton[value="1"]  { background:#00aa00; color:#fff; border:1px solid #00ee00; }
+#KillLowButton  { background:#04060c; color:#202266; border:1px solid #080c18; }
+#KillLowButton[value="1"]  { background:#0044cc; color:#fff; border:1px solid #3377ff; }
+
+#PFLButton { background:#04080c; color:#224466; border:1px solid #0a1828; font-size:12pt; }
+#PFLButton[value="1"] { background:#007799; color:#00d4f0; border:1px solid #00d4f0; }
+
+#QuantizeGroup { padding: 0 2px; }
+#QuantizeLabel { font-size: 7pt; color:#555; text-transform:uppercase; letter-spacing:1px; }
+#QuantizeButton { background:#0a0a0a; color:#cc4400; font-size:9pt; font-weight:900; border:1px solid #2a1008; }
+#QuantizeButton[value="1"] { color:#ff6600; border-color:#ff6600; background:#150800; }
+
+/* Separadores transport */
+#TS_Sep1, #TS_Sep2, #TS_Sep3, #TS_Sep4 {
+  background-color: #1a1a1a;
+  border-left: 1px solid #1a1a1a;
+  margin: 4px 0;
+}
+
+/* ── BEAT FX ────────────────────────────────────────────────────── */
+#BeatFX_Container {
+  background-color: #0a0a10;
+  border: 2px solid #1a1a28;
+  border-radius: 2px;
+  margin-left: 4px;
+  padding: 2px;
+}
+#BeatFX_Header { background-color: #1a1a28; padding: 2px 0; }
+#BeatFX_Title { font-size: 9pt; font-weight: 800; color: #aaaacc; letter-spacing: 2px; text-transform: uppercase; }
+
+#BeatFX_Unit { padding: 2px; border: 1px solid #1a1a28; background: #080810; margin: 1px; }
+#BeatFX_Unit[highlight="1"] { border: 1px solid #0066ff; background: #05051a; }
+
+WEffectSelector {
+  background-color: #0a0a1a;
+  color: #0ddcf2;
+  font-size: 11pt;
+  font-weight: 900;
+  padding: 3px 6px;
+  border: none;
+  text-transform: uppercase;
+  selection-background-color: #0066ff;
+}
+WEffectSelector:hover { background-color: #101025; }
+WEffectSelector QListView {
+  background-color: #0a0a1a; color: #0ddcf2;
+  selection-background-color: #0066ff; selection-color: #fff;
+}
+
+#EffectToggle {
+  font-size: 9pt; font-weight: 700; letter-spacing: 1px;
+  color: #333; background: #080810; border: 1px solid #1a1a28;
+}
+#EffectToggle[value="1"] { color: #6ee128; background: #041404; border: 1px solid #4aa01a; }
+
+#BeatFX_ChLabel { padding: 1px 0; }
+#BeatFX_ChSelect { background: #0a0a10; padding: 1px; border-top: 1px solid #1a1a28; }
+#BeatFX_Ch1, #BeatFX_ChMaster, #BeatFX_Ch2 {
+  font-size: 9pt; font-weight: 800;
+  background: #111118; color: #444; border: 1px solid #1e1e28;
+}
+#BeatFX_Ch1[value="1"]      { background:#082258; color:#4488dd; border-color:#2255aa; }
+#BeatFX_ChMaster[value="1"] { background:#082258; color:#4488dd; border-color:#2255aa; }
+#BeatFX_Ch2[value="1"]      { background:#082258; color:#4488dd; border-color:#2255aa; }
+
+/* ── LIBRARY ────────────────────────────────────────────────────── */
+#LibraryWrapper QScrollBar:vertical { border:0; width:4px; background:#1a1a1a; }
+#LibraryWrapper QScrollBar::handle:vertical { background:#333; border-radius:2px; min-height:20px; }
+#LibraryWrapper QScrollBar::add-page, #LibraryWrapper QScrollBar::sub-page { background:#000; }
+#LibraryWrapper QScrollBar::add-line, #LibraryWrapper QScrollBar::sub-line { height:0; width:0; }
+#LibraryWrapper QScrollBar:horizontal { height:0; }
+
+#LibraryWrapper WTrackTableViewHeader::section {
+  background-color: #1a1a28; color: #c3d541;
+  font-weight: 700; font-size: 9pt; margin: 1px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+#LibraryWrapper QTableView,
+#LibraryWrapper WLibraryTextBrowser {
+  background-color: #000; alternate-background-color: #0a0a10;
+  selection-background-color: #0d1428; selection-color: #fff;
+  color: #d0d0d0; font-size: 10pt;
+}
+#LibraryWrapper WLibrarySidebar {
+  background-color: #0a0a10; selection-background-color: #0d1428;
+  border-left: 3px solid #1a1a28;
+  color: #c0c0c0; font-weight: 600; font-size: 10pt;
+  selection-color: #c3d541;
+}
+WLabel { color: #e0e0e0; }
+
+#SearchBox {
+  background-color: #0d1428; border: 1px solid #1e2a44;
+  border-radius: 3px; color: #e0e0e0; font-size: 11pt;
+  font-weight: 600; padding: 4px 8px;
+}
+#SearchBox:focus { border-color: #0066ff; background: #10163a; }
+
+#SidebarContainer { background-color: #0a0d1a; border-bottom: 1px solid #1a1a28; }
+#SidebarButton {
+  background-color: rgba(0,0,0,0.3); border: 2px solid #333;
+  border-radius: 3px; color: #888; font-size: 10pt;
+  font-weight: 700; margin: 4px;
+}
+#SidebarButton:hover { border-color: #555; color: #bbb; }
+
+/* ── SAMPLERS ────────────────────────────────────────────────────── */
+#Sampler {
+  background-color: #1a1a24; border: 2px solid #d73535;
+  border-radius: 2px; color: white; font-size: 14pt; margin: 3px; padding: 2px;
+}
+#Sampler[value="1"] { background-color: #d73535; }
+#Sampler_Info { color: #aaa; font-size: 8pt; margin: 3px; }
+
+
+/* ══════════════════════════════════════════════════
+   PARCHE v11 — BeatFX compacto + Tabs con margen
+   ══════════════════════════════════════════════════ */
+
+/* BEAT FX — sin espacio extra entre slots */
+#BeatFX_Container {
+  background-color: #0a0a10;
+  border: 2px solid #1a1a28;
+  border-radius: 2px;
+  margin-left: 4px;
+  padding: 2px 3px;
+}
+#BeatFX_Header {
+  background-color: #1a1a28;
+  padding: 1px 4px;
+  margin-bottom: 2px;
+}
+#BeatFX_Title {
+  font-size: 8pt;
+  font-weight: 800;
+  color: #aaaacc;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  qproperty-alignment: 'AlignHCenter | AlignVCenter';
+}
+
+/* Cada slot ON/OFF + selector como fila compacta */
+#BeatFX_Unit {
+  padding: 1px 0;
+  border: none;
+  background: transparent;
+  margin: 0;
+}
+#BeatFX_Unit[highlight="1"] {
+  border: 1px solid #0066ff;
+  background: #05051a;
+  border-radius: 2px;
+}
+
+#EffectToggle {
+  font-size: 8pt;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #555;
+  background: #0a0a14;
+  border: 1px solid #222;
+  border-radius: 2px;
+  padding: 0;
+}
+#EffectToggle[value="1"] {
+  color: #6ee128;
+  background: #041404;
+  border-color: #4aa01a;
+}
+
+WEffectSelector {
+  background-color: #0a0a1a;
+  color: #0ddcf2;
+  font-size: 9pt;
+  font-weight: 900;
+  padding: 2px 4px;
+  border: none;
+  text-transform: uppercase;
+  selection-background-color: #0066ff;
+}
+WEffectSelector:hover { background-color: #101025; }
+
+/* CH SELECT label compacto */
+#BeatFX_ChSelectLabel {
+  font-size: 7pt;
+  font-weight: 700;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  qproperty-alignment: 'AlignHCenter | AlignVCenter';
+  margin-top: 2px;
+}
+#BeatFX_ChSelect {
+  background: transparent;
+  padding: 0;
+  border-top: 1px solid #1a1a28;
+  margin-top: 1px;
+}
+#BeatFX_Ch1, #BeatFX_ChMaster, #BeatFX_Ch2 {
+  font-size: 8pt;
+  font-weight: 800;
+  background: #111118;
+  color: #333;
+  border: 1px solid #1e1e28;
+  border-radius: 2px;
+  padding: 0;
+}
+#BeatFX_Ch1[value="1"]      { background: #082258; color: #4488dd; border-color: #2255aa; }
+#BeatFX_ChMaster[value="1"] { background: #082258; color: #4488dd; border-color: #2255aa; }
+#BeatFX_Ch2[value="1"]      { background: #082258; color: #4488dd; border-color: #2255aa; }
+
+/* TABS — 3 tabs con margen y aspecto Pioneered */
+#TabControls {
+  background-color: #000;
+  padding: 3px 0 0 0;
+}
+#TabControls WPushButton {
+  background-color: #000;
+  border: 2px solid #252525;
+  color: #3a3a3a;
+  font-size: 11pt;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  min-height: 28px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  border-radius: 3px;
+  margin: 1px 0;
+}
+#TabControls WPushButton:hover {
+  border-color: #555;
+  color: #777;
+}
+#TabControls WPushButton[value="1"] {
+  border: 2px solid #c3d541;
+  color: #c3d541;
+  background-color: #0c0e00;
+}
+
+/* Separadores transport */
+#TS_Sep1, #TS_Sep2, #TS_Sep3, #TS_Sep4 {
+  background-color: #111;
+  border-left: 1px solid #2a2a2a;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+/* Transporte — todos los botones distribuidos con 0me */
+#DeckTransport WPushButton {
+  font-size: 9pt;
+  font-weight: 700;
+  min-height: 30px;
+  padding: 0 2px;
+}
+#DeckTransport #LoopSizeSpinBox {
+  font-size: 9pt;
+  font-weight: 700;
+  color: #0ddcf2;
+  background: #0a0a14;
+  border: 1px solid #1a1a28;
+}
+
+/* ══════════════════════════════════════════════════
+   PARCHE v12 — Knob intensidad FX verde
+   ══════════════════════════════════════════════════ */
+#EffectMetaKnob {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0 1px;
+}
+
+/* ══════════════════════════════════════════════════
+   PARCHE v13 — BeatFX Pioneered original + Tabs centrados
+   ══════════════════════════════════════════════════ */
+
+/* ── BeatFX (copia exacta Pioneered) ───────────── */
+#BeatFX_Container {
+  border: 2px solid #32323c;
+  margin-left: 4px;
+  qproperty-layoutAlignment: 'AlignCenter | AlignTop';
+}
+#BeatFX_Header {
+  background-color: #32323c;
+  qproperty-layoutAlignment: 'AlignHCenter | AlignVCenter';
+}
+#BeatFX_Title {
+  font-size: 13pt;
+  font-weight: bold;
+  text-transform: uppercase;
+  color: #e5e6ea;
+  qproperty-alignment: 'AlignHCenter | AlignVCenter';
+}
+#BeatFX_Unit[highlight="0"] {
+  padding: 1px;
+  border: 1px solid #32323c;
+}
+#BeatFX_Unit[highlight="1"] {
+  padding: 1px;
+  border: 1px solid #2d85cd;
+}
+WEffectSelector {
+  background-color: transparent;
+  color: #2d85cd;
+  font-size: 13pt;
+  font-weight: bold;
+  padding: 4px;
+  text-transform: uppercase;
+}
+#EffectMeter {
+  padding: 0px 1px 0px 1px;
+}
+#EffectToggle {
+  color: gray;
+  font-weight: bold;
+  font-size: 11pt;
+  text-transform: uppercase;
+}
+#EffectToggle[value="1"] {
+  color: #2d85cd;
+}
+
+/* ── Tabs CENTRADOS con margen arriba/abajo ─────── */
+#TabControls {
+  background-color: #000000;
+  padding: 4px 0;
+}
+#TabButtonOverview,
+#TabButtonBrowse,
+#TabButtonSamplers {
+  background-color: #0a0a0a;
+  border: 2px solid #32323c;
+  border-radius: 3px;
+  color: #505060;
+  font-size: 12pt;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 4px 16px;
+  margin: 4px 0;
+}
+#TabButtonOverview:hover,
+#TabButtonBrowse:hover,
+#TabButtonSamplers:hover {
+  border-color: #666;
+  color: #999;
+}
+#TabButtonOverview[value="1"],
+#TabButtonBrowse[value="1"],
+#TabButtonSamplers[value="1"] {
+  border: 2px solid #c3d541;
+  color: #c3d541;
+  background-color: #0c0e00;
+}
+
+/* CH SELECT — colores Pioneered azul */
+#BeatFX_ChSelectLabel {
+  font-size: 8pt;
+  font-weight: bold;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  qproperty-alignment: 'AlignHCenter | AlignVCenter';
+}
+#BeatFX_Ch1, #BeatFX_ChMaster, #BeatFX_Ch2 {
+  font-size: 10pt;
+  font-weight: bold;
+  background: #111118;
+  color: #444;
+  border: 1px solid #1e1e28;
+  border-radius: 2px;
+}
+#BeatFX_Ch1[value="1"],
+#BeatFX_ChMaster[value="1"],
+#BeatFX_Ch2[value="1"] {
+  background: #082258;
+  color: #4488dd;
+  border-color: #2255aa;
+}
+
+
+/* ===== Mixxx Stems port ===== */
+#TabButtonStems { background-color:#0a0a0a; border:2px solid #32323c; border-radius:3px; color:#505060; font-size:12pt; font-weight:800; padding:4px 12px; margin:4px 0; }
+#TabButtonStems:hover { border-color:#666; color:#999; }
+#TabButtonStems[value="1"] { border:2px solid #c3d541; color:#c3d541; background-color:#0c0e00; }
+#StemsPage { background:#050508; padding:6px; }
+#StemsPageTitle { color:#c3d541; font-size:13pt; font-weight:900; qproperty-alignment:'AlignHCenter | AlignVCenter'; }
+#StemDeck { background:#08080d; border:1px solid #252535; padding:6px; }
+#StemDeckTitle { color:#e8e8e8; font-size:12pt; font-weight:900; qproperty-alignment:'AlignHCenter | AlignVCenter'; }
+#StemGlobalStatus { background:#090b0e; border:1px solid #20242a; padding:0 8px; }
+#StemGlobalStatus WLabel { color:#6f747c; font-size:8pt; font-weight:700; qproperty-alignment:'AlignHCenter | AlignVCenter'; }
+#StemGlobalValue { color:#c3d541; background:#020303; border:1px solid #252a2f; font-size:9pt; font-weight:800; }
+#StemGenerateButton { background:#0c220c; color:#6ee128; border:1px solid #2a6a1a; font-size:8pt; font-weight:900; }
+#StemGenerateButton:hover { background:#143414; border-color:#52a52a; }
+#StemCancelButton { background:#220808; color:#ff6a6a; border:1px solid #7a2020; font-size:8pt; font-weight:900; }
+#StemCancelButton:hover { background:#381010; border-color:#b83a3a; }
+#StemState { background:#0a0d12; color:#8c939d; border:1px solid #303640; font-size:8pt; font-weight:900; }
+#StemState[value="1"], #StemState[value="2"] { color:#f1c34b; border-color:#7c6324; }
+#StemState[value="3"], #StemState[value="4"], #StemState[value="5"] { color:#55b9ff; border-color:#256a9c; }
+#StemState[value="6"] { color:#6ee128; background:#0c220c; border-color:#3a831f; }
+#StemState[value="7"] { color:#d6a766; border-color:#77572b; }
+#StemState[value="8"], #StemState[value="9"] { color:#ff6a6a; background:#220808; border-color:#8b2929; }
+#StemState[value="10"] { color:#d7a9ff; border-color:#68458a; }
+#StemProgress, #StemCount, #StemCacheStatus, #StemQueuePosition, #StemError { color:#fff; background:#000; border:1px solid #333; font-size:10pt; font-weight:800; }
+#StemRow { background:#0c0c12; border-bottom:1px solid #20202c; padding:2px; }
+#StemName { color:#c3d541; font-size:10pt; font-weight:900; qproperty-alignment:'AlignLeft | AlignVCenter'; }
+#StemMuteButton { background:#092009; color:#6ee128; border:1px solid #276527; font-weight:800; }
+#StemMuteButton[value="1"] { background:#4a0909; color:#ff7777; border-color:#aa3333; }
+#StemVolumeLabel, #StemColorLabel, #StemCacheLabel, #StemCountLabel, #StemPercentLabel { color:#777; font-size:7pt; font-weight:700; qproperty-alignment:'AlignHCenter | AlignVCenter'; }
+#StemVolumeValue, #StemColorValue { color:#ddd; background:#030305; border:1px solid #222; }
+#StemEmpty { background:#07080a; border:1px dashed #333841; }
+#StemEmptyTitle { color:#777f89; font-size:12pt; font-weight:900; qproperty-alignment:'AlignHCenter | AlignVCenter'; }
+#StemEmptyHint { color:#505760; font-size:8pt; qproperty-alignment:'AlignHCenter | AlignVCenter'; }
+#StemsFooter { color:#777; font-size:8pt; qproperty-alignment:'AlignHCenter | AlignVCenter'; }

@@ -1,0 +1,127 @@
+name: ONNX Runtime C++ smoke test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/onnxruntime-smoke.yml
+      - cmake/modules/Findonnxruntime.cmake
+      - src/stems/demucsonnxrunner.cpp
+      - src/stems/demucsonnxrunner.h
+      - tools/stems/onnx-smoke/**
+      - CMakeLists.txt
+
+permissions:
+  contents: read
+
+concurrency:
+  group: onnxruntime-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            runner: windows-2025
+            triplet: x64-windows-release
+            bootstrap: .\bootstrap-vcpkg.bat
+            vcpkg: .\vcpkg.exe
+            architecture: $env:PROCESSOR_ARCHITECTURE
+            executable: build/onnx-smoke/Release/demucs-onnx-smoke.exe
+          - name: Ubuntu 24.04 ARM64
+            runner: ubuntu-24.04-arm
+            triplet: arm64-linux-release
+            bootstrap: ./bootstrap-vcpkg.sh
+            vcpkg: ./vcpkg
+            architecture: uname -m
+            executable: build/onnx-smoke/demucs-onnx-smoke
+    env:
+      GH_TOKEN: ${{ github.token }}
+      HTDEMUCS_SHA256: db37d1314ac1e1051e7978d25ef45b3f1d3f43c837678752f592c0f2deca752d
+      HTDEMUCS_TAG: htdemucs-955717e8-onnx-v1
+      VCPKG_BINARY_SOURCES: clear;files,${{ github.workspace }}/vcpkg-binary-cache,readwrite
+      VCPKG_COMMIT: 859d11a94a9cf32fbf7fecc7de3b54980102470b
+      VCPKG_DEFAULT_HOST_TRIPLET: ${{ matrix.triplet }}
+      VCPKG_DEFAULT_TRIPLET: ${{ matrix.triplet }}
+      VCPKG_MAX_CONCURRENCY: 3
+    steps:
+      - name: Check out Mixxx
+        uses: actions/checkout@v7
+
+      - name: Check out pinned vcpkg fork
+        uses: actions/checkout@v7
+        with:
+          repository: nauzete/vcpkg-mixxx-stems
+          ref: ${{ env.VCPKG_COMMIT }}
+          path: _deps/vcpkg
+          persist-credentials: false
+
+      - name: Restore vcpkg binary cache
+        uses: actions/cache@v5
+        with:
+          path: vcpkg-binary-cache
+          key: onnxruntime-${{ matrix.triplet }}-${{ env.VCPKG_COMMIT }}
+
+      - name: Create vcpkg binary cache
+        run: cmake -E make_directory "${{ github.workspace }}/vcpkg-binary-cache"
+
+      - name: Verify native runner architecture
+        run: ${{ matrix.architecture }}
+
+      - name: Bootstrap vcpkg
+        run: ${{ matrix.bootstrap }}
+        working-directory: _deps/vcpkg
+
+      - name: Build ONNX Runtime CPU
+        run: >-
+          ${{ matrix.vcpkg }} install
+          onnxruntime:${{ matrix.triplet }}
+          --classic
+          --clean-after-build
+          --x-abi-tools-use-exact-versions
+        working-directory: _deps/vcpkg
+
+      - name: Configure C++ smoke test
+        run: >-
+          cmake
+          -S tools/stems/onnx-smoke
+          -B build/onnx-smoke
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/_deps/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }}
+
+      - name: Build C++ smoke test
+        run: cmake --build build/onnx-smoke --config Release --parallel 2
+
+      - name: Download published HTDemucs model
+        run: >-
+          gh release download "${{ env.HTDEMUCS_TAG }}"
+          --repo nauzete/mixxx-stems
+          --pattern htdemucs.onnx
+          --dir model
+
+      - name: Verify model SHA-256
+        shell: pwsh
+        run: |
+          $actual = (Get-FileHash -Algorithm SHA256 model/htdemucs.onnx).Hash.ToLowerInvariant()
+          if ($actual -ne $env:HTDEMUCS_SHA256) {
+            throw "Unexpected model SHA-256: $actual"
+          }
+
+      - name: Run real-model CPU inference
+        shell: pwsh
+        run: |
+          & "${{ matrix.executable }}" "model/htdemucs.onnx"
+          if ($LASTEXITCODE -ne 0) {
+            exit $LASTEXITCODE
+          }
+
+      - name: Verify smoke executable architecture
+        if: runner.os == 'Linux'
+        run: file "${{ matrix.executable }}"
